@@ -1,53 +1,113 @@
-import { SidebarProvider, Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarRail, SidebarSeparator, SidebarTrigger } from "@/components/ui/sidebar";
+"use client";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  SidebarProvider,
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarRail,
+  SidebarSeparator,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import Link from "next/link";
 import { Home, List, Settings, Map, Users } from "lucide-react";
+import { loadAuth } from "@/lib/auth";
+import { Role } from "@/lib/types";
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const router = useRouter();
+  const [role, setRole] = useState<Role | null>("zone_admin");
+
+  useEffect(() => {
+    const auth = loadAuth();
+    if (!auth) {
+      router.replace("/login");
+      return;
+    }
+    setRole(auth.user.role);
+  }, [router]);
+
+  const navItems = useMemo(() => {
+    if (role === "investor") {
+      return [
+        { href: "/dashboard", label: "Dashboard", icon: Home },
+        {
+          href: "/dashboard?view=opportunities",
+          label: "Zone Opportunities",
+          icon: List,
+        },
+      ];
+    }
+    if (role === "zone_admin") {
+      return [
+        { href: "/dashboard", label: "Dashboard", icon: Home },
+        { href: "/zone-data", label: "Zone Data", icon: Map },
+        { href: "/farmers", label: "Farmers", icon: Users },
+      ];
+    }
+    if (role === "central_admin") {
+      return [{ href: "/dashboard", label: "Dashboard", icon: Home }];
+    }
+    return [] as { href: string; label: string; icon: any }[];
+  }, [role]);
+
+  const groupLabel =
+    role === "investor"
+      ? "Investor"
+      : role === "zone_admin"
+      ? "Zone Admin"
+      : role === "central_admin"
+      ? "Central Admin"
+      : "";
+
+  if (!role) return null;
+
   return (
     <SidebarProvider>
       <Sidebar collapsible="icon">
         <SidebarHeader>
           <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild>
-                <Link href="/dashboard">
-                  <Home />
-                  <span>Dashboard</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild>
-                <Link href="/zone-data">
-                  <Map />
-                  <span>Zone Data</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild>
-                <Link href="/farmers">
-                  <Users />
-                  <span>Farmers</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+            {navItems.map((item) => (
+              <SidebarMenuItem key={item.href}>
+                <SidebarMenuButton asChild>
+                  <Link href={item.href}>
+                    <item.icon />
+                    <span>{item.label}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
           </SidebarMenu>
         </SidebarHeader>
         <SidebarContent>
           <SidebarGroup>
-            <SidebarGroupLabel>Investor</SidebarGroupLabel>
+            <SidebarGroupLabel>{groupLabel}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
-                    <Link href="/dashboard">
-                      <Home />
-                      <span>Overview</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                {navItems.map((item) => (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton asChild>
+                      <Link href={item.href}>
+                        <item.icon />
+                        <span>{item.label}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
@@ -74,12 +134,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <Topbar />
           </div>
         </div>
-        <div className="p-4">
-          {children}
-        </div>
+        <div className="p-4">{children}</div>
       </SidebarInset>
     </SidebarProvider>
   );
 }
-
-

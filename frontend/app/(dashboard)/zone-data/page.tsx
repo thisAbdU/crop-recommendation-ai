@@ -25,6 +25,10 @@ export default function ZoneDataPage() {
       router.replace("/login");
       return;
     }
+    if (auth.user.role !== "zone_admin") {
+      router.replace("/dashboard");
+      return;
+    }
     setUser(auth.user);
   }, [router]);
 
