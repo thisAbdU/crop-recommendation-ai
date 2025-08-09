@@ -1,124 +1,286 @@
-"use client";
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import {
-  SidebarProvider,
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarInset,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarRail,
-  SidebarSeparator,
-  SidebarTrigger,
-} from "@/components/ui/sidebar";
+"use client"
+
+import { SidebarProvider, Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarRail, SidebarSeparator, SidebarTrigger } from "@/components/ui/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import Link from "next/link";
-import { Home, List, Settings, Map, Users } from "lucide-react";
+import { Home, BarChart3, User, Settings, Leaf, MapPin, TrendingUp, Clock, Wifi, Users, Building2, Crop, AlertTriangle, FileText, Calendar } from "lucide-react";
+import { useEffect, useState } from "react";
 import { loadAuth } from "@/lib/auth";
 import { Role } from "@/lib/types";
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const router = useRouter();
-  const [role, setRole] = useState<Role | null>("zone_admin");
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const [userRole, setUserRole] = useState<Role | null>(null);
+  const [userName, setUserName] = useState<string>("");
 
   useEffect(() => {
     const auth = loadAuth();
-    if (!auth) {
-      router.replace("/login");
-      return;
+    if (auth) {
+      setUserRole(auth.user.role);
+      setUserName(auth.user.name);
     }
-    setRole(auth.user.role);
-  }, [router]);
+  }, []);
 
-  const navItems = useMemo(() => {
-    if (role === "investor") {
-      return [
-        { href: "/dashboard", label: "Dashboard", icon: Home },
-        {
-          href: "/dashboard?view=opportunities",
-          label: "Zone Opportunities",
-          icon: List,
-        },
-      ];
+  const getRoleDisplayName = (role: Role) => {
+    switch (role) {
+      case "central_admin":
+        return "Central Administrator";
+      case "zone_admin":
+        return "Zone Administrator";
+      case "investor":
+        return "Investor";
+      default:
+        return "User";
     }
-    if (role === "zone_admin") {
-      return [
-        { href: "/dashboard", label: "Dashboard", icon: Home },
-        { href: "/zone-data", label: "Zone Data", icon: Map },
-        { href: "/farmers", label: "Farmers", icon: Users },
-      ];
-    }
-    if (role === "central_admin") {
-      return [{ href: "/dashboard", label: "Dashboard", icon: Home }];
-    }
-    return [] as { href: string; label: string; icon: any }[];
-  }, [role]);
+  };
 
-  const groupLabel =
-    role === "investor"
-      ? "Investor"
-      : role === "zone_admin"
-      ? "Zone Admin"
-      : role === "central_admin"
-      ? "Central Admin"
-      : "";
-
-  if (!role) return null;
+  const getRoleColor = (role: Role) => {
+    switch (role) {
+      case "central_admin":
+        return "bg-purple-100 text-purple-600";
+      case "zone_admin":
+        return "bg-blue-100 text-blue-600";
+      case "investor":
+        return "bg-green-100 text-green-600";
+      default:
+        return "bg-gray-100 text-gray-600";
+    }
+  };
 
   return (
     <SidebarProvider>
       <Sidebar collapsible="icon">
         <SidebarHeader>
           <SidebarMenu>
-            {navItems.map((item) => (
-              <SidebarMenuItem key={item.href}>
-                <SidebarMenuButton asChild>
-                  <Link href={item.href}>
-                    <item.icon />
-                    <span>{item.label}</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild>
+                <Link href="/dashboard" className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary text-primary-foreground">
+                    <Leaf className="w-5 h-5" />
+                  </div>
+                  <span className="font-semibold text-lg">CropAI</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
           </SidebarMenu>
         </SidebarHeader>
-        <SidebarContent>
+        
+        <SidebarContent className="space-y-6">
+          {/* User Info Section */}
           <SidebarGroup>
-            <SidebarGroupLabel>{groupLabel}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <div className="px-3 py-4 glass-effect rounded-lg mx-2">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    <User className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">{userName}</p>
+                    <p className={`text-xs px-2 py-1 rounded-full inline-block ${getRoleColor(userRole || "investor")}`}>
+                      {getRoleDisplayName(userRole || "investor")}
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Active Zones</span>
+                    <span className="font-medium">3</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">This Month</span>
+                    <span className="font-medium text-green-600">+12%</span>
+                  </div>
+                </div>
+              </div>
+            </SidebarGroupContent>
+          </SidebarGroup>
+
+          {/* Quick Stats */}
+          <SidebarGroup>
+            <SidebarGroupLabel>Quick Stats</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <div className="space-y-2 px-2">
+                <div className="sidebar-stats-item flex items-center gap-2 p-2 rounded-lg bg-green-50 hover:bg-green-100 transition-colors cursor-pointer">
+                  <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
+                    <MapPin className="w-4 h-4 text-green-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Monitored Zones</p>
+                    <p className="text-xs text-muted-foreground">3 active locations</p>
+                  </div>
+                </div>
+                
+                <div className="sidebar-stats-item flex items-center gap-2 p-2 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors cursor-pointer">
+                  <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                    <TrendingUp className="w-4 h-4 text-blue-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Avg. Suitability</p>
+                    <p className="text-xs text-muted-foreground">82% across zones</p>
+                  </div>
+                </div>
+                
+                <div className="sidebar-stats-item flex items-center gap-2 p-2 rounded-lg bg-orange-50 hover:bg-orange-100 transition-colors cursor-pointer">
+                  <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center">
+                    <Clock className="w-4 h-4 text-orange-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Last Update</p>
+                    <p className="text-xs text-muted-foreground">2 hours ago</p>
+                  </div>
+                </div>
+              </div>
+            </SidebarGroupContent>
+          </SidebarGroup>
+
+          {/* Navigation */}
+          <SidebarGroup>
+            <SidebarGroupLabel>Navigation</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {navItems.map((item) => (
-                  <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton asChild>
-                      <Link href={item.href}>
-                        <item.icon />
-                        <span>{item.label}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <Link href="/dashboard" className="flex items-center gap-3">
+                      <Home className="w-4 h-4" />
+                      <span>Dashboard</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                
+                {/* Central Admin Navigation */}
+                {userRole === "central_admin" && (
+                  <>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild>
+                        <Link href="/dashboard/zones" className="flex items-center gap-3">
+                          <MapPin className="w-4 h-4" />
+                          <span>Zones Management</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild>
+                        <Link href="/dashboard/iot-devices" className="flex items-center gap-3">
+                          <Wifi className="w-4 h-4" />
+                          <span>IoT Devices</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild>
+                        <Link href="/dashboard/users" className="flex items-center gap-3">
+                          <Users className="w-4 h-4" />
+                          <span>User Management</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild>
+                        <Link href="/dashboard/reports" className="flex items-center gap-3">
+                          <FileText className="w-4 h-4" />
+                          <span>System Reports</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  </>
+                )}
+
+                {/* Zone Admin Navigation */}
+                {userRole === "zone_admin" && (
+                  <>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild>
+                        <Link href="/dashboard/my-zone" className="flex items-center gap-3">
+                          <Building2 className="w-4 h-4" />
+                          <span>My Zone</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild>
+                        <Link href="/dashboard/crop-recommendations" className="flex items-center gap-3">
+                          <Crop className="w-4 h-4" />
+                          <span>Crop Recommendations</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild>
+                        <Link href="/dashboard/alerts" className="flex items-center gap-3">
+                          <AlertTriangle className="w-4 h-4" />
+                          <span>Alerts & Notifications</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild>
+                        <Link href="/dashboard/schedule" className="flex items-center gap-3">
+                          <Calendar className="w-4 h-4" />
+                          <span>Maintenance Schedule</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  </>
+                )}
+
+                {/* Investor Navigation */}
+                {userRole === "investor" && (
+                  <>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild>
+                        <Link href="/dashboard/portfolio" className="flex items-center gap-3">
+                          <BarChart3 className="w-4 h-4" />
+                          <span>Investment Portfolio</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild>
+                        <Link href="/dashboard/performance" className="flex items-center gap-3">
+                          <TrendingUp className="w-4 h-4" />
+                          <span>Performance Analytics</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild>
+                        <Link href="/dashboard/reports" className="flex items-center gap-3">
+                          <FileText className="w-4 h-4" />
+                          <span>Financial Reports</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  </>
+                )}
+
+                {/* Common Navigation for All Roles */}
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <Link href="/dashboard/analytics" className="flex items-center gap-3">
+                      <BarChart3 className="w-4 h-4" />
+                      <span>Analytics</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
         </SidebarContent>
+        
         <SidebarSeparator />
         <SidebarFooter>
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton asChild>
-                <Link href="#">
-                  <Settings />
+                <Link href="/profile" className="flex items-center gap-3">
+                  <User className="w-4 h-4" />
+                  <span>Profile</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild>
+                <Link href="/settings" className="flex items-center gap-3">
+                  <Settings className="w-4 h-4" />
                   <span>Settings</span>
                 </Link>
               </SidebarMenuButton>
@@ -128,13 +290,17 @@ export default function DashboardLayout({
         <SidebarRail />
       </Sidebar>
       <SidebarInset>
-        <div className="sticky top-0 z-10 bg-background">
-          <div className="flex items-center gap-2 p-2 border-b">
+        <div className="sticky top-0 z-10 glass-effect border-b border-border/50">
+          <div className="flex items-center gap-2 p-2">
             <SidebarTrigger />
             <Topbar />
           </div>
         </div>
-        <div className="p-4">{children}</div>
+        <div className="interactive-bg min-h-screen">
+          <div className="p-6">
+            {children}
+          </div>
+        </div>
       </SidebarInset>
     </SidebarProvider>
   );
