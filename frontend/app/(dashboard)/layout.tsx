@@ -1,7 +1,7 @@
 import { SidebarProvider, Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarRail, SidebarSeparator, SidebarTrigger } from "@/components/ui/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import Link from "next/link";
-import { Home, List, Settings } from "lucide-react";
+import { Home, List, Settings, Map, Users } from "lucide-react";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -19,9 +19,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton asChild>
-                <Link href="/dashboard?view=opportunities">
-                  <List />
-                  <span>Zone Opportunities</span>
+                <Link href="/zone-data">
+                  <Map />
+                  <span>Zone Data</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild>
+                <Link href="/farmers">
+                  <Users />
+                  <span>Farmers</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
