@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 import os
 import joblib
 import pandas as pd
+import numpy as np
 import requests
 from dotenv import load_dotenv, find_dotenv
 
@@ -98,6 +99,89 @@ def _generate_gemini_report(prompt_text, api_key):
         return full_text
     except Exception as exc:
         raise RuntimeError(f'Failed to parse Gemini response: {exc}')
+
+
+def get_top_crop_recommendations(model, X_input, crop_list):
+    """
+    Compute per-crop suitability probabilities, convert to percentages [0, 100],
+    and return top 3 crops with rank and rounded percentage.
+
+    Parameters
+    - model: Trained classifier with predict_proba
+    - X_input: Single-sample features (array-like or DataFrame) shape (1, n_features)
+    - crop_list: List of crop names aligned to the model's output order. If None, uses model.classes_.
+
+    Returns dict:
+    {
+      'predictions': { 'crop': percent_float, ... },
+      'top_recommendations': [ { 'crop': str, 'score_percent': float, 'rank': int }, ... ]
+    }
+    """
+    # Normalize input to 2D numpy array
+    if isinstance(X_input, pd.DataFrame):
+        X_arr = X_input.values
+    else:
+        X_arr = np.asarray(X_input)
+    if X_arr.ndim == 1:
+        X_arr = X_arr.reshape(1, -1)
+
+    # Get probabilities. Handle both multiclass (n_samples, n_classes)
+    # and list-of-arrays from some multilabel/OvR setups.
+    proba = model.predict_proba(X_arr)
+    if isinstance(proba, list):
+        # Expect a list of arrays per class; take positive-class column where present
+        pos_cols = []
+        for cls_proba in proba:
+            arr = np.asarray(cls_proba)
+            if arr.ndim == 1:
+                pos_cols.append(arr)
+            else:
+                # Take column 1 if available, else column 0
+                col_index = 1 if arr.shape[1] >= 2 else 0
+                pos_cols.append(arr[:, col_index])
+        proba_matrix = np.vstack(pos_cols).T  # shape (n_samples, n_classes)
+    else:
+        proba_matrix = np.asarray(proba)  # shape (n_samples, n_classes)
+
+    if proba_matrix.ndim != 2 or proba_matrix.shape[0] < 1:
+        raise ValueError('predict_proba returned unexpected shape')
+
+    sample_proba = proba_matrix[0]
+
+    # Determine crop order
+    if crop_list is None:
+        if hasattr(model, 'classes_'):
+            crop_list = [str(c) for c in model.classes_]
+        else:
+            raise ValueError('crop_list is required when model lacks classes_')
+
+    if len(crop_list) != sample_proba.shape[0]:
+        raise ValueError('Length of crop_list does not match number of probability outputs')
+
+    # Convert to percentages and clamp
+    predictions_percent = {}
+    for crop_name, prob in zip(crop_list, sample_proba):
+        pct = float(prob) * 100.0
+        if pct < 0.0:
+            pct = 0.0
+        elif pct > 100.0:
+            pct = 100.0
+        predictions_percent[str(crop_name)] = pct
+
+    # Top 3
+    sorted_items = sorted(predictions_percent.items(), key=lambda kv: kv[1], reverse=True)
+    top_three = []
+    for rank, (crop_name, pct) in enumerate(sorted_items[:3], start=1):
+        top_three.append({
+            'crop': crop_name,
+            'score_percent': round(pct, 1),
+            'rank': rank,
+        })
+
+    return {
+        'predictions': predictions_percent,
+        'top_recommendations': top_three,
+    }
 
 
 @app.route('/predict', methods=['POST'])
