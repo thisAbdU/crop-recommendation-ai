@@ -1,0 +1,39 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: agri_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Flask Web Application
+  web:
+    build: .
+    environment:
+      - FLASK_ENV=development
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/agri_db
+      - JWT_SECRET_KEY=your-secret-key-change-in-production
+      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY}
+      - PROMPTS_DIR=/app/prompts
+      - ADMIN_EMAIL=admin@example.com
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./prompts:/app/prompts
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data: 
