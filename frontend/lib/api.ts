@@ -83,6 +83,7 @@ export async function getDashboardDataForRole(role: Role, user?: User) {
         const lastSensorUpdate = data.length ? new Date(Math.max(...data.map((d) => new Date(d.read_from_iot_at).getTime()))).toISOString() : "";
         const topSoilType = recs[0]?.key_environmental_factors.soil_type ?? "Unknown";
         const bestScore = recs[0]?.suitability_score ?? 0;
+        const location = zone.region;
 
         return {
           zone,
@@ -91,6 +92,7 @@ export async function getDashboardDataForRole(role: Role, user?: User) {
           lastSensorUpdate,
           topSoilType,
           bestScore,
+          location,
         };
       })
     );

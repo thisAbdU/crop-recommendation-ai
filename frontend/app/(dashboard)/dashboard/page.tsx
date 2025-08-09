@@ -16,7 +16,10 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { InvestorStats } from "@/components/dashboard/investor-stats";
-import { ZoneFilters, type ZoneFilter } from "@/components/dashboard/zone-filters";
+import {
+  ZoneFilters,
+  type ZoneFilter,
+} from "@/components/dashboard/zone-filters";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -24,7 +27,12 @@ export default function DashboardPage() {
   const [role, setRole] = useState<Role | null>("zone_admin");
   const [data, setData] = useState<any>(null);
   const [search, setSearch] = useState("");
-  const [filters, setFilters] = useState<ZoneFilter>({ cropName: "", soilType: null, minScore: null, maxScore: null });
+  const [filters, setFilters] = useState<ZoneFilter>({
+    cropName: "",
+    soilType: null,
+    minScore: null,
+    maxScore: null,
+  });
 
   useEffect(() => {
     const auth = loadAuth();
@@ -63,9 +71,17 @@ export default function DashboardPage() {
 
       {role === "investor" && Array.isArray(data) ? (
         <div className="space-y-6">
-          <InvestorStats totalZones={data.length} cropsThisMonth={Math.max(1, Math.round(data.length * 1.5))} pctChange={12} />
+          <InvestorStats
+            totalZones={data.length}
+            cropsThisMonth={Math.max(1, Math.round(data.length * 1.5))}
+            pctChange={12}
+          />
 
-          <ZoneFilters value={filters} onChange={setFilters} soilTypeOptions={[...new Set(data.map((d: any) => d.topSoilType))]} />
+          <ZoneFilters
+            value={filters}
+            onChange={setFilters}
+            soilTypeOptions={[...new Set(data.map((d: any) => d.topSoilType))]}
+          />
 
           <Card>
             <CardHeader>
@@ -86,25 +102,54 @@ export default function DashboardPage() {
                 <TableBody>
                   {data
                     .filter((item: any) => {
-                      const nameMatch = filters.cropName ? item.topRecommendations.some((r: Recommendation) => r.crop_name.toLowerCase().includes(filters.cropName.toLowerCase())) : true;
-                      const soilMatch = filters.soilType ? item.topSoilType === filters.soilType : true;
-                      const minMatch = filters.minScore != null ? item.bestScore >= filters.minScore : true;
-                      const maxMatch = filters.maxScore != null ? item.bestScore <= filters.maxScore : true;
+                      const nameMatch = filters.cropName
+                        ? item.topRecommendations.some((r: Recommendation) =>
+                            r.crop_name
+                              .toLowerCase()
+                              .includes(filters.cropName.toLowerCase())
+                          )
+                        : true;
+                      const soilMatch = filters.soilType
+                        ? item.topSoilType === filters.soilType
+                        : true;
+                      const minMatch =
+                        filters.minScore != null
+                          ? item.bestScore >= filters.minScore
+                          : true;
+                      const maxMatch =
+                        filters.maxScore != null
+                          ? item.bestScore <= filters.maxScore
+                          : true;
                       return nameMatch && soilMatch && minMatch && maxMatch;
                     })
                     .map((item: any) => (
                       <TableRow key={item.zone.id}>
-                        <TableCell className="font-medium">{item.zone.name}</TableCell>
+                        <TableCell className="font-medium">
+                          {item.zone.name}
+                        </TableCell>
                         <TableCell>
                           <div className="text-sm">
-                            {item.topRecommendations.map((r: Recommendation) => r.crop_name).join(", ")}
+                            {item.topRecommendations
+                              .map((r: Recommendation) => r.crop_name)
+                              .join(", ")}
                           </div>
                         </TableCell>
                         <TableCell>{item.bestScore}%</TableCell>
                         <TableCell>{item.topSoilType}</TableCell>
-                        <TableCell>{item.lastSensorUpdate ? new Date(item.lastSensorUpdate).toLocaleString() : "—"}</TableCell>
                         <TableCell>
-                          <Button size="sm" onClick={() => router.push(`/zone/${item.zone.id}/opportunities`)}>View</Button>
+                          {item.lastSensorUpdate
+                            ? new Date(item.lastSensorUpdate).toLocaleString()
+                            : "—"}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            size="sm"
+                            onClick={() =>
+                              router.push(`/zone/${item.zone.id}/opportunities`)
+                            }
+                          >
+                            View
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
