@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getRecommendationById, regenerateRecommendation, updateRecommendationStatus } from "@/lib/api";
 import { Recommendation } from "@/lib/types";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AIChat } from "@/components/chat/ai-chat";
 
@@ -45,32 +45,56 @@ export default function RecommendationDetailPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>{rec.crop_name} · {rec.suitability_score}%</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="text-sm text-muted-foreground">
-            <div>Soil type: {rec.key_environmental_factors.soil_type}</div>
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Recommendation</CardTitle>
+            <CardDescription>{new Date(rec.createdAt).toLocaleString()}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="text-sm">
+              <div className="text-2xl font-semibold">{rec.crop_name}</div>
+              <div className="text-muted-foreground">Suitability score: {rec.suitability_score}%</div>
+              <div className="text-muted-foreground">Soil type: {rec.key_environmental_factors.soil_type}</div>
+            </div>
+          </CardContent>
+          <CardFooter className="gap-2">
+            <Button onClick={handleApprove} disabled={rec.status === "approved"}>Approve</Button>
+            <Button variant="outline" onClick={handleRegenerate}>Regenerate</Button>
+            <Button variant="outline" onClick={handleDecline} disabled={rec.status === "declined"}>Decline</Button>
+          </CardFooter>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Environmental Factors</CardTitle>
+          </CardHeader>
+          <CardContent className="grid sm:grid-cols-2 gap-3 text-sm text-muted-foreground">
             <div>pH: {rec.key_environmental_factors.ph}</div>
             <div>Moisture: {rec.key_environmental_factors.moisture_range}</div>
             <div>Rainfall: {rec.key_environmental_factors.rainfall_forecast}</div>
-          </div>
-          <div>
-            <div className="text-sm font-medium mb-1">AI rationale</div>
-            <p className="text-sm leading-6">{rec.rationale}</p>
-          </div>
+            <div>Soil Type: {rec.key_environmental_factors.soil_type}</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>AI Rationale</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-sm leading-6 text-muted-foreground whitespace-pre-wrap">{rec.rationale}</div>
         </CardContent>
-        <CardFooter className="gap-2">
-          <Button onClick={handleApprove} disabled={rec.status === "approved"}>Approve</Button>
-          <Button variant="outline" onClick={handleRegenerate}>Regenerate</Button>
-          <Button variant="outline" onClick={handleDecline} disabled={rec.status === "declined"}>Decline</Button>
-        </CardFooter>
       </Card>
 
-      <div>
-        <AIChat seed="Ask follow-up questions about this recommendation." />
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Chat with AI</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <AIChat seed="Ask follow-up questions about this recommendation." />
+        </CardContent>
+      </Card>
     </div>
   );
 }

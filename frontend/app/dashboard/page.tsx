@@ -15,6 +15,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
+import { InvestorStats } from "@/components/dashboard/investor-stats";
+import { ZoneFilters, type ZoneFilter } from "@/components/dashboard/zone-filters";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -22,6 +24,7 @@ export default function DashboardPage() {
   const [role, setRole] = useState<Role | null>("zone_admin");
   const [data, setData] = useState<any>(null);
   const [search, setSearch] = useState("");
+  const [filters, setFilters] = useState<ZoneFilter>({ cropName: "", soilType: null, minScore: null, maxScore: null });
 
   useEffect(() => {
     const auth = loadAuth();
@@ -59,45 +62,56 @@ export default function DashboardPage() {
       </div>
 
       {role === "investor" && Array.isArray(data) ? (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {data.map((item: any) => (
-            <Card key={item.zone.id}>
-              <CardHeader>
-                <CardTitle>{item.zone.name}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="text-sm text-muted-foreground">
-                  Avg pH: {item.metrics.avgPh} · Moisture:{" "}
-                  {item.metrics.avgMoisture}% · Temp: {item.metrics.avgTemp}°C
-                </div>
-                <div>
-                  <div className="text-sm font-medium mb-2">
-                    Top recommendations
-                  </div>
-                  <div className="space-y-1">
-                    {item.topRecommendations.map((r: Recommendation) => (
-                      <div
-                        key={r.id}
-                        className="flex items-center justify-between text-sm"
-                      >
-                        <span>{r.crop_name}</span>
-                        <span className="text-muted-foreground">
-                          {r.suitability_score}%
-                        </span>
-                      </div>
+        <div className="space-y-6">
+          <InvestorStats totalZones={data.length} cropsThisMonth={Math.max(1, Math.round(data.length * 1.5))} pctChange={12} />
+
+          <ZoneFilters value={filters} onChange={setFilters} soilTypeOptions={[...new Set(data.map((d: any) => d.topSoilType))]} />
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Zones</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Zone</TableHead>
+                    <TableHead>Top crops</TableHead>
+                    <TableHead>Suitability</TableHead>
+                    <TableHead>Soil type</TableHead>
+                    <TableHead>Last update</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data
+                    .filter((item: any) => {
+                      const nameMatch = filters.cropName ? item.topRecommendations.some((r: Recommendation) => r.crop_name.toLowerCase().includes(filters.cropName.toLowerCase())) : true;
+                      const soilMatch = filters.soilType ? item.topSoilType === filters.soilType : true;
+                      const minMatch = filters.minScore != null ? item.bestScore >= filters.minScore : true;
+                      const maxMatch = filters.maxScore != null ? item.bestScore <= filters.maxScore : true;
+                      return nameMatch && soilMatch && minMatch && maxMatch;
+                    })
+                    .map((item: any) => (
+                      <TableRow key={item.zone.id}>
+                        <TableCell className="font-medium">{item.zone.name}</TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            {item.topRecommendations.map((r: Recommendation) => r.crop_name).join(", ")}
+                          </div>
+                        </TableCell>
+                        <TableCell>{item.bestScore}%</TableCell>
+                        <TableCell>{item.topSoilType}</TableCell>
+                        <TableCell>{item.lastSensorUpdate ? new Date(item.lastSensorUpdate).toLocaleString() : "—"}</TableCell>
+                        <TableCell>
+                          <Button size="sm" onClick={() => router.push(`/zone/${item.zone.id}/opportunities`)}>View</Button>
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </div>
-                </div>
-                <Button
-                  onClick={() =>
-                    router.push(`/zone/${item.zone.id}/opportunities`)
-                  }
-                >
-                  View zone
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </div>
       ) : null}
 

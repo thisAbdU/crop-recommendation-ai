@@ -80,11 +80,17 @@ export async function getDashboardDataForRole(role: Role, user?: User) {
         const avgPh = Number(avg(data.map((d) => d.ph)).toFixed(2));
         const avgMoisture = Number(avg(data.map((d) => d.soil_moisture)).toFixed(2));
         const avgTemp = Number(avg(data.map((d) => d.temperature)).toFixed(2));
+        const lastSensorUpdate = data.length ? new Date(Math.max(...data.map((d) => new Date(d.read_from_iot_at).getTime()))).toISOString() : "";
+        const topSoilType = recs[0]?.key_environmental_factors.soil_type ?? "Unknown";
+        const bestScore = recs[0]?.suitability_score ?? 0;
 
         return {
           zone,
           topRecommendations: recs.slice(0, 3),
           metrics: { avgPh, avgMoisture, avgTemp },
+          lastSensorUpdate,
+          topSoilType,
+          bestScore,
         };
       })
     );
