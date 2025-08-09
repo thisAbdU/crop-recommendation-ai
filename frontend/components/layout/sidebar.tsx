@@ -27,7 +27,8 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     if (role === "zone_admin") {
       return [
         { href: "/dashboard", label: "Dashboard", icon: Home },
-        { href: "/dashboard", label: "My Zone", icon: Map },
+        { href: "/zone-data", label: "Zone Data", icon: Map },
+        { href: "/farmers", label: "Farmers", icon: Map },
       ]
     }
     return [
@@ -66,5 +67,6 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     </div>
   )
 }
+
 
 

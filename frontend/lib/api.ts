@@ -1,5 +1,5 @@
-import { mockRecommendations, mockSensorData, mockTechnicians, mockUsers, mockZones } from "./mockData";
-import { Recommendation, Role, SensorDataPoint, Technician, User, Zone } from "./types";
+import { mockRecommendations, mockSensorData, mockTechnicians, mockUsers, mockZones, mockFarmers, mockDevices } from "./mockData";
+import { Recommendation, Role, SensorDataPoint, Technician, User, Zone, Farmer } from "./types";
 
 export async function loginWithJwtMock(email: string, _password: string): Promise<{ token: string; user: User } | null> {
   const user = mockUsers.find((u) => u.email === email);
@@ -16,7 +16,9 @@ export async function getZoneById(id: string): Promise<Zone | undefined> {
 }
 
 export async function getRecommendationsByZone(zoneId: string): Promise<Recommendation[]> {
-  return mockRecommendations.filter((r) => r.zoneId === zoneId);
+  return mockRecommendations
+    .filter((r) => r.zoneId === zoneId)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
 export async function getApprovedRecommendationsByZone(zoneId: string): Promise<Recommendation[]> {
@@ -41,10 +43,10 @@ export async function getSensorDataByZone(zoneId: string, from?: string, to?: st
 }
 
 export async function updateRecommendationStatus(id: string, status: "approved" | "declined"): Promise<Recommendation | null> {
-  const rec = mockRecommendations.find((r) => r.id === id);
-  if (!rec) return null;
-  rec.status = status;
-  return rec;
+  const idx = mockRecommendations.findIndex((r) => r.id === id);
+  if (idx === -1) return null;
+  mockRecommendations[idx] = { ...mockRecommendations[idx], status };
+  return mockRecommendations[idx];
 }
 
 export async function regenerateRecommendation(id: string): Promise<Recommendation | null> {
@@ -100,7 +102,21 @@ export async function getDashboardDataForRole(role: Role, user?: User) {
 
   if (role === "zone_admin" && user?.zoneId) {
     const recs = mockRecommendations.filter((r) => r.zoneId === user.zoneId);
-    return recs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const farmersInZone = mockFarmers.filter((f) => f.zoneId === user.zoneId);
+    const activeDevices = mockDevices.filter((d) => d.zoneId === user.zoneId && d.status === "online");
+    return {
+      stats: {
+        totalFarmers: farmersInZone.length,
+        activeDevices: activeDevices.length,
+        latestRecommendationStatus: recs
+          .slice()
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]?.status ?? "pending",
+      },
+      recentRecommendations: recs
+        .slice()
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 5),
+    };
   }
 
   if (role === "central_admin") {
@@ -112,6 +128,30 @@ export async function getDashboardDataForRole(role: Role, user?: User) {
   }
 
   return null;
+}
+
+export async function getFarmersByZone(zoneId: string): Promise<Farmer[]> {
+  return mockFarmers.filter((f) => f.zoneId === zoneId);
+}
+
+export async function createFarmer(farmer: Omit<Farmer, "id">): Promise<Farmer> {
+  const newFarmer: Farmer = { ...farmer, id: `f${Math.random().toString(36).slice(2, 8)}` };
+  mockFarmers.push(newFarmer);
+  return newFarmer;
+}
+
+export async function updateFarmer(id: string, updates: Partial<Omit<Farmer, "id">>): Promise<Farmer | null> {
+  const idx = mockFarmers.findIndex((f) => f.id === id);
+  if (idx === -1) return null;
+  mockFarmers[idx] = { ...mockFarmers[idx], ...updates };
+  return mockFarmers[idx];
+}
+
+export async function deleteFarmer(id: string): Promise<boolean> {
+  const idx = mockFarmers.findIndex((f) => f.id === id);
+  if (idx === -1) return false;
+  mockFarmers.splice(idx, 1);
+  return true;
 }
 
 

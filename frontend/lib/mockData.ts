@@ -1,4 +1,4 @@
-import { Recommendation, SensorDataPoint, Technician, User, Zone } from "./types";
+import { Recommendation, SensorDataPoint, Technician, User, Zone, Farmer, Device } from "./types";
 
 export const mockUsers: User[] = [
   { id: "u1", name: "Ivy Investor", email: "ivy@example.com", role: "investor" },
@@ -15,6 +15,20 @@ export const mockZones: Zone[] = [
 export const mockTechnicians: Technician[] = [
   { id: "t1", name: "Tech One", assignedZoneIds: ["z1"] },
   { id: "t2", name: "Tech Two", assignedZoneIds: ["z2", "z3"] },
+];
+
+export const mockFarmers: Farmer[] = [
+  { id: "f1", name: "Alice Mwangi", phone: "+254700111222", language: "English", zoneId: "z1" },
+  { id: "f2", name: "Babu Singh", phone: "+919811223344", language: "Hindi", zoneId: "z1" },
+  { id: "f3", name: "Chidi Okeke", phone: "+2348012345678", language: "Igbo", zoneId: "z2" },
+  { id: "f4", name: "Diana Mensah", phone: "+233201234567", language: "Twi", zoneId: "z3" },
+];
+
+export const mockDevices: Device[] = [
+  { id: "d1", zoneId: "z1", status: "online" },
+  { id: "d2", zoneId: "z1", status: "offline" },
+  { id: "d3", zoneId: "z2", status: "online" },
+  { id: "d4", zoneId: "z3", status: "online" },
 ];
 
 const now = Date.now();
@@ -88,5 +102,6 @@ export const mockRecommendations: Recommendation[] = [
     createdAt: daysAgo(1),
   },
 ];
+
 
 

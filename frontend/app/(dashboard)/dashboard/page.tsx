@@ -160,62 +160,91 @@ export default function DashboardPage() {
         </div>
       ) : null}
 
-      {role === "zone_admin" && Array.isArray(data) ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Your zone recommendations</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="mb-3">
-              <Input
-                placeholder="Filter by crop name..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Crop</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Score</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data
-                  .filter((r: Recommendation) =>
-                    r.crop_name.toLowerCase().includes(search.toLowerCase())
-                  )
-                  .map((r: Recommendation) => (
-                    <TableRow key={r.id}>
-                      <TableCell className="font-medium">
-                        {r.crop_name}
-                      </TableCell>
-                      <TableCell className="capitalize">{r.status}</TableCell>
-                      <TableCell>{r.suitability_score}%</TableCell>
-                      <TableCell>
-                        {new Date(r.createdAt).toLocaleString()}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            onClick={() =>
-                              router.push(`/recommendation/${r.id}`)
-                            }
-                          >
-                            Open
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+      {role === "zone_admin" && data ? (
+        <div className="space-y-6">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Card>
+              <CardHeader>
+                <CardTitle>Total Farmers</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-semibold">{data.stats.totalFarmers}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Active IoT Devices</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-semibold">{data.stats.activeDevices}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Latest Recommendation</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-semibold capitalize">{data.stats.latestRecommendationStatus}</div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Recommendations</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="mb-3">
+                <Input
+                  placeholder="Filter by crop name..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Crop</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Score</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.recentRecommendations
+                    .filter((r: Recommendation) =>
+                      r.crop_name.toLowerCase().includes(search.toLowerCase())
+                    )
+                    .map((r: Recommendation) => (
+                      <TableRow key={r.id}>
+                        <TableCell className="font-medium">
+                          {r.crop_name}
+                        </TableCell>
+                        <TableCell className="capitalize">{r.status}</TableCell>
+                        <TableCell>{r.suitability_score}%</TableCell>
+                        <TableCell>
+                          {new Date(r.createdAt).toLocaleString()}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() =>
+                                router.push(`/recommendation/${r.id}`)
+                              }
+                            >
+                              Open
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </div>
       ) : null}
 
       {role === "central_admin" && data ? (
@@ -279,3 +308,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+

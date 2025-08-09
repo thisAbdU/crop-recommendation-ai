@@ -50,4 +50,19 @@ export type Technician = {
   assignedZoneIds: string[];
 };
 
+export type Farmer = {
+  id: string;
+  name: string;
+  phone: string;
+  language: string;
+  zoneId: string;
+};
+
+export type Device = {
+  id: string;
+  zoneId: string;
+  status: "online" | "offline";
+};
+
+
 
