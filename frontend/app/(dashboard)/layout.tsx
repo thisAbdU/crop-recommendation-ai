@@ -222,45 +222,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   </>
                 )}
 
-                {/* Investor Navigation */}
-                {userRole === "investor" && (
-                  <>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild>
-                        <Link href="/dashboard/portfolio" className="flex items-center gap-3">
-                          <BarChart3 className="w-4 h-4" />
-                          <span>Investment Portfolio</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild>
-                        <Link href="/dashboard/performance" className="flex items-center gap-3">
-                          <TrendingUp className="w-4 h-4" />
-                          <span>Performance Analytics</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild>
-                        <Link href="/dashboard/reports" className="flex items-center gap-3">
-                          <FileText className="w-4 h-4" />
-                          <span>Financial Reports</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  </>
-                )}
-
-                {/* Common Navigation for All Roles */}
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
-                    <Link href="/dashboard/analytics" className="flex items-center gap-3">
-                      <BarChart3 className="w-4 h-4" />
-                      <span>Analytics</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>

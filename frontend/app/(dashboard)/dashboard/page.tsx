@@ -15,12 +15,18 @@ import {
   Crop, 
   AlertTriangle, 
   Calendar,
-  TrendingUp,
-  FileText,
-  DollarSign,
-  Target
+  Target,
+  Eye
 } from "lucide-react";
 import Link from "next/link";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 export default function DashboardPage() {
   const [userRole, setUserRole] = useState<Role | null>(null);
@@ -298,36 +304,14 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Investment Dashboard</h1>
-          <p className="text-muted-foreground">Monitor your agricultural investments and returns</p>
-                </div>
+          <p className="text-muted-foreground">Monitor your agricultural investments and zones</p>
+        </div>
         <Badge className={getRoleColor("investor")}>
           {getRoleDisplayName("investor")}
         </Badge>
-              </div>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Investment</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">$2.4M</div>
-            <p className="text-xs text-muted-foreground">+12% from last quarter</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">ROI</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">18.5%</div>
-            <p className="text-xs text-muted-foreground">+2.3% from last month</p>
-          </CardContent>
-        </Card>
-
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Active Zones</CardTitle>
@@ -341,42 +325,205 @@ export default function DashboardPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Monthly Revenue</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-            <div className="text-2xl font-bold">$156K</div>
-            <p className="text-xs text-muted-foreground">+8% from last month</p>
-            </CardContent>
-          </Card>
-        </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Portfolio Performance</CardTitle>
-            <CardDescription>Investment performance by zone</CardDescription>
+            <CardTitle className="text-sm font-medium">Total Crops</CardTitle>
+            <Crop className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex justify-between items-center">
-              <span className="text-sm">Zone A - Wheat</span>
-              <span className="text-sm font-medium text-green-600">+22%</span>
-              </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm">Zone B - Corn</span>
-              <span className="text-sm font-medium text-green-600">+18%</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm">Zone C - Soybeans</span>
-              <span className="text-sm font-medium text-green-600">+15%</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm">Zone D - Rice</span>
-              <span className="text-sm font-medium text-orange-600">+8%</span>
-                        </div>
+          <CardContent>
+            <div className="text-2xl font-bold">24</div>
+            <p className="text-xs text-muted-foreground">Across all zones</p>
           </CardContent>
         </Card>
 
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Average Suitability</CardTitle>
+            <Target className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">85%</div>
+            <p className="text-xs text-muted-foreground">Optimal conditions</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">System Status</CardTitle>
+            <Wifi className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">98%</div>
+            <p className="text-xs text-muted-foreground">All systems operational</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Your Investment Zones</CardTitle>
+          <CardDescription>Overview of all zones associated with your investments</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Zone</TableHead>
+                <TableHead>Location</TableHead>
+                <TableHead>Recommended Crop</TableHead>
+                <TableHead>Suitability Score</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow>
+                <TableCell className="font-medium">Green Valley</TableCell>
+                <TableCell>North Region</TableCell>
+                <TableCell>Maize</TableCell>
+                <TableCell>
+                  <Badge variant="secondary" className="bg-green-100 text-green-700">
+                    82%
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  <Button asChild size="sm" variant="outline">
+                    <Link href="/zone/z1/chat">
+                      <Eye className="w-4 h-4 mr-2" />
+                      View
+                    </Link>
+                  </Button>
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-medium">Sun Plains</TableCell>
+                <TableCell>East Region</TableCell>
+                <TableCell>Rice</TableCell>
+                <TableCell>
+                  <Badge variant="secondary" className="bg-green-100 text-green-700">
+                    90%
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  <Button asChild size="sm" variant="outline">
+                    <Link href="/zone/z2/chat">
+                      <Eye className="w-4 h-4 mr-2" />
+                      View
+                    </Link>
+                  </Button>
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-medium">River Bend</TableCell>
+                <TableCell>West Region</TableCell>
+                <TableCell>Wheat</TableCell>
+                <TableCell>
+                  <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                    76%
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  <Button asChild size="sm" variant="outline">
+                    <Link href="/zone/z3/chat">
+                      <Eye className="w-4 h-4 mr-2" />
+                      View
+                    </Link>
+                  </Button>
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-medium">Mountain View</TableCell>
+                <TableCell>South Region</TableCell>
+                <TableCell>Soybeans</TableCell>
+                <TableCell>
+                  <Badge variant="secondary" className="bg-green-100 text-green-700">
+                    88%
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  <Button asChild size="sm" variant="outline">
+                    <Link href="/zone/z4/chat">
+                      <Eye className="w-4 h-4 mr-2" />
+                      View
+                    </Link>
+                  </Button>
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-medium">Desert Oasis</TableCell>
+                <TableCell>Central Region</TableCell>
+                <TableCell>Millet</TableCell>
+                <TableCell>
+                  <Badge variant="secondary" className="bg-yellow-100 text-yellow-700">
+                    65%
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  <Button asChild size="sm" variant="outline">
+                    <Link href="/zone/z5/chat">
+                      <Eye className="w-4 h-4 mr-2" />
+                      View
+                    </Link>
+                  </Button>
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-medium">Coastal Fields</TableCell>
+                <TableCell>Coastal Region</TableCell>
+                <TableCell>Coconut</TableCell>
+                <TableCell>
+                  <Badge variant="secondary" className="bg-green-100 text-green-700">
+                    92%
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  <Button asChild size="sm" variant="outline">
+                    <Link href="/zone/z6/chat">
+                      <Eye className="w-4 h-4 mr-2" />
+                      View
+                    </Link>
+                  </Button>
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-medium">Highland Farms</TableCell>
+                <TableCell>Highland Region</TableCell>
+                <TableCell>Tea</TableCell>
+                <TableCell>
+                  <Badge variant="secondary" className="bg-green-100 text-green-700">
+                    87%
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  <Button asChild size="sm" variant="outline">
+                    <Link href="/zone/z7/chat">
+                      <Eye className="w-4 h-4 mr-2" />
+                      View
+                    </Link>
+                  </Button>
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-medium">Valley Gardens</TableCell>
+                <TableCell>Valley Region</TableCell>
+                <TableCell>Tomatoes</TableCell>
+                <TableCell>
+                  <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                    78%
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  <Button asChild size="sm" variant="outline">
+                    <Link href="/zone/z8/chat">
+                      <Eye className="w-4 h-4 mr-2" />
+                      View
+                    </Link>
+                  </Button>
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
             <CardTitle>Quick Actions</CardTitle>
@@ -384,23 +531,53 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <Button asChild className="w-full justify-start">
-              <Link href="/dashboard/portfolio">
+              <Link href="/dashboard/zones">
+                <MapPin className="mr-2 h-4 w-4" />
+                View All Zones
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="w-full justify-start">
+              <Link href="/dashboard/crop-recommendations">
+                <Crop className="mr-2 h-4 w-4" />
+                Crop Recommendations
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="w-full justify-start">
+              <Link href="/dashboard/zone-data">
                 <BarChart3 className="mr-2 h-4 w-4" />
-                View Portfolio
+                Zone Analytics
               </Link>
             </Button>
-            <Button asChild variant="outline" className="w-full justify-start">
-              <Link href="/dashboard/performance">
-                <TrendingUp className="mr-2 h-4 w-4" />
-                Performance Analytics
-              </Link>
-            </Button>
-            <Button asChild variant="outline" className="w-full justify-start">
-              <Link href="/dashboard/reports">
-                <FileText className="mr-2 h-4 w-4" />
-                Financial Reports
-              </Link>
-                        </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Zone Updates</CardTitle>
+            <CardDescription>Latest zone performance and recommendations</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center space-x-3">
+              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+              <div className="flex-1">
+                <p className="text-sm font-medium">New crop recommendation for Green Valley</p>
+                <p className="text-xs text-muted-foreground">2 hours ago</p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-3">
+              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+              <div className="flex-1">
+                <p className="text-sm font-medium">Sun Plains suitability score improved to 90%</p>
+                <p className="text-xs text-muted-foreground">4 hours ago</p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-3">
+              <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+              <div className="flex-1">
+                <p className="text-sm font-medium">River Bend irrigation system maintenance scheduled</p>
+                <p className="text-xs text-muted-foreground">6 hours ago</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
