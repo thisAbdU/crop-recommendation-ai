@@ -1,12 +1,20 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { usePermissions } from '@/hooks/usePermissions';
-import { DataService } from '@/services/dataService';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { MapPin, Users, Crop, TrendingUp, Target, BarChart3, Wifi } from 'lucide-react';
+import { useEffect, useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { usePermissions } from "@/hooks/usePermissions";
+import { DataService } from "@/services/dataService";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  MapPin,
+  Users,
+  Crop,
+  TrendingUp,
+  Target,
+  BarChart3,
+  Wifi,
+} from "lucide-react";
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -18,10 +26,13 @@ export default function DashboardPage() {
     const loadDashboardData = async () => {
       try {
         setLoading(true);
-        const data = await DataService.getDashboardStats(user?.role || '', user?.zone_id);
+        const data = await DataService.getDashboardStats(
+          user?.role || "",
+          user?.zone_id
+        );
         setStats(data);
       } catch (error) {
-        console.error('Failed to load dashboard data:', error);
+        console.error("Failed to load dashboard data:", error);
       } finally {
         setLoading(false);
       }
@@ -50,12 +61,15 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-3xl font-bold">Welcome back, {user?.name}!</h1>
           <p className="text-muted-foreground">
-            Here's what's happening in your {user?.role?.replace('_', ' ')} dashboard
+            Here's what's happening in your {user?.role?.replace("_", " ")}{" "}
+            dashboard
           </p>
         </div>
         <div className="text-right">
           <p className="text-sm text-muted-foreground">Last updated</p>
-          <p className="text-sm font-medium">{new Date().toLocaleTimeString()}</p>
+          <p className="text-sm font-medium">
+            {new Date().toLocaleTimeString()}
+          </p>
         </div>
       </div>
 
@@ -77,11 +91,15 @@ export default function DashboardPage() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Devices</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Active Devices
+              </CardTitle>
               <Wifi className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.activeDevices || 0}</div>
+              <div className="text-2xl font-bold">
+                {stats.activeDevices || 0}
+              </div>
               <p className="text-xs text-muted-foreground">
                 IoT sensors online
               </p>
@@ -90,11 +108,15 @@ export default function DashboardPage() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Recommendations</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Recommendations
+              </CardTitle>
               <Crop className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.totalRecommendations || 0}</div>
+              <div className="text-2xl font-bold">
+                {stats.totalRecommendations || 0}
+              </div>
               <p className="text-xs text-muted-foreground">
                 Generated this month
               </p>
@@ -103,11 +125,15 @@ export default function DashboardPage() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">System Health</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                System Health
+              </CardTitle>
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">{stats.systemHealth || '98%'}</div>
+              <div className="text-2xl font-bold text-green-600">
+                {stats.systemHealth || "98%"}
+              </div>
               <p className="text-xs text-muted-foreground">
                 All systems operational
               </p>
@@ -126,7 +152,7 @@ export default function DashboardPage() {
             <CardContent>
               <div className="text-2xl font-bold text-green-600">Active</div>
               <p className="text-xs text-muted-foreground">
-                Zone: {user?.zone_id || 'N/A'}
+                Zone: {user?.zone_id || "N/A"}
               </p>
             </CardContent>
           </Card>
@@ -137,7 +163,9 @@ export default function DashboardPage() {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.totalFarmers || 0}</div>
+              <div className="text-2xl font-bold">
+                {stats.totalFarmers || 0}
+              </div>
               <p className="text-xs text-muted-foreground">
                 Registered in your zone
               </p>
@@ -150,10 +178,10 @@ export default function DashboardPage() {
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.sensorReadings || 0}</div>
-              <p className="text-xs text-muted-foreground">
-                Readings today
-              </p>
+              <div className="text-2xl font-bold">
+                {stats.sensorReadings || 0}
+              </div>
+              <p className="text-xs text-muted-foreground">Readings today</p>
             </CardContent>
           </Card>
         </div>
@@ -163,11 +191,15 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Opportunities</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Opportunities
+              </CardTitle>
               <Target className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.availableOpportunities || 0}</div>
+              <div className="text-2xl font-bold">
+                {stats.availableOpportunities || 0}
+              </div>
               <p className="text-xs text-muted-foreground">
                 Zones available for investment
               </p>
@@ -176,11 +208,15 @@ export default function DashboardPage() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Portfolio Value</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Portfolio Value
+              </CardTitle>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${stats.portfolioValue || '0'}</div>
+              <div className="text-2xl font-bold">
+                ${stats.portfolioValue || "0"}
+              </div>
               <p className="text-xs text-muted-foreground">
                 Total investment value
               </p>
@@ -193,7 +229,9 @@ export default function DashboardPage() {
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">{stats.roi || '0%'}</div>
+              <div className="text-2xl font-bold text-green-600">
+                {stats.roi || "0%"}
+              </div>
               <p className="text-xs text-muted-foreground">
                 Average return on investment
               </p>
@@ -225,7 +263,7 @@ export default function DashboardPage() {
                 </Button>
               </>
             )}
-            
+
             {isZoneAdmin && (
               <>
                 <Button variant="outline" size="sm">
@@ -238,7 +276,7 @@ export default function DashboardPage() {
                 </Button>
               </>
             )}
-            
+
             {isInvestor && (
               <>
                 <Button variant="outline" size="sm">

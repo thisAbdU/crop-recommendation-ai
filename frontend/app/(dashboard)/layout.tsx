@@ -1,14 +1,53 @@
 "use client";
 
-import { SidebarProvider, Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarRail, SidebarSeparator, SidebarTrigger } from "@/components/ui/sidebar";
+import {
+  SidebarProvider,
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarRail,
+  SidebarSeparator,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import Link from "next/link";
-import { Home, BarChart3, User, Settings, Leaf, MapPin, TrendingUp, Clock, Wifi, Users, Building2, Crop, AlertTriangle, FileText, Calendar, Shield, Database, Target } from "lucide-react";
+import {
+  Home,
+  BarChart3,
+  User,
+  Settings,
+  Leaf,
+  MapPin,
+  TrendingUp,
+  Clock,
+  Wifi,
+  Users,
+  Building2,
+  Crop,
+  AlertTriangle,
+  FileText,
+  Calendar,
+  Shield,
+  Database,
+  Target,
+} from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const { isAuthenticated, user, loading } = useAuth();
   const router = useRouter();
 
@@ -78,7 +117,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarHeader>
-        
+
         <SidebarContent className="space-y-6">
           {/* User Info Section */}
           <SidebarGroup>
@@ -90,18 +129,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   </div>
                   <div>
                     <p className="font-medium text-sm">{user.name}</p>
-                    <p className={`text-xs px-2 py-1 rounded-full inline-block ${getRoleColor(user.role)}`}>
+                    <p
+                      className={`text-xs px-2 py-1 rounded-full inline-block ${getRoleColor(
+                        user.role
+                      )}`}
+                    >
                       {getRoleDisplayName(user.role)}
                     </p>
                   </div>
                 </div>
-                
+
                 <div className="space-y-2 text-xs">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Active Zones</span>
                     <span className="font-medium">
-                      {user.role === "zone_admin" && user.zone_id ? "1" : 
-                       user.role === "central_admin" ? "3" : "0"}
+                      {user.role === "zone_admin" && user.zone_id
+                        ? "1"
+                        : user.role === "central_admin"
+                        ? "3"
+                        : "0"}
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -127,13 +173,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-                
+
                 {/* Central Admin Navigation */}
                 {user.role === "central_admin" && (
                   <>
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild>
-                        <Link href="/dashboard/zones" className="flex items-center gap-3">
+                        <Link
+                          href="/dashboard/zones"
+                          className="flex items-center gap-3"
+                        >
                           <MapPin className="w-4 h-4" />
                           <span>Zones</span>
                         </Link>
@@ -141,7 +190,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     </SidebarMenuItem>
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild>
-                        <Link href="/dashboard/recommendations" className="flex items-center gap-3">
+                        <Link
+                          href="/dashboard/recommendations"
+                          className="flex items-center gap-3"
+                        >
                           <Crop className="w-4 h-4" />
                           <span>Recommendations</span>
                         </Link>
@@ -149,7 +201,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     </SidebarMenuItem>
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild>
-                        <Link href="/dashboard/iot-devices" className="flex items-center gap-3">
+                        <Link
+                          href="/dashboard/iot-devices"
+                          className="flex items-center gap-3"
+                        >
                           <Wifi className="w-4 h-4" />
                           <span>IoT Devices</span>
                         </Link>
@@ -157,13 +212,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     </SidebarMenuItem>
                   </>
                 )}
-                
+
                 {/* Zone Admin Navigation */}
                 {user.role === "zone_admin" && (
                   <>
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild>
-                        <Link href="/dashboard/zone-data" className="flex items-center gap-3">
+                        <Link
+                          href="/dashboard/zone-data"
+                          className="flex items-center gap-3"
+                        >
                           <BarChart3 className="w-4 h-4" />
                           <span>Zone Data</span>
                         </Link>
@@ -171,7 +229,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     </SidebarMenuItem>
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild>
-                        <Link href="/dashboard/farmers" className="flex items-center gap-3">
+                        <Link
+                          href="/dashboard/farmers"
+                          className="flex items-center gap-3"
+                        >
                           <Users className="w-4 h-4" />
                           <span>Farmers</span>
                         </Link>
@@ -179,7 +240,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     </SidebarMenuItem>
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild>
-                        <Link href="/dashboard/crop-recommendations" className="flex items-center gap-3">
+                        <Link
+                          href="/dashboard/crop-recommendations"
+                          className="flex items-center gap-3"
+                        >
                           <Crop className="w-4 h-4" />
                           <span>Recommendations</span>
                         </Link>
@@ -187,13 +251,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     </SidebarMenuItem>
                   </>
                 )}
-                
+
                 {/* Investor Navigation */}
                 {user.role === "investor" && (
                   <>
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild>
-                        <Link href="/dashboard/zone-opportunities" className="flex items-center gap-3">
+                        <Link
+                          href="/dashboard/zone-opportunities"
+                          className="flex items-center gap-3"
+                        >
                           <Target className="w-4 h-4" />
                           <span>Zone Opportunities</span>
                         </Link>
@@ -201,7 +268,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     </SidebarMenuItem>
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild>
-                        <Link href="/dashboard/portfolio" className="flex items-center gap-3">
+                        <Link
+                          href="/dashboard/portfolio"
+                          className="flex items-center gap-3"
+                        >
                           <TrendingUp className="w-4 h-4" />
                           <span>Portfolio</span>
                         </Link>
@@ -213,14 +283,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </SidebarGroupContent>
           </SidebarGroup>
         </SidebarContent>
-        
+
         <SidebarFooter>
           <SidebarGroup>
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild>
-                    <Link href="/dashboard/profile" className="flex items-center gap-3">
+                    <Link
+                      href="/dashboard/profile"
+                      className="flex items-center gap-3"
+                    >
                       <Settings className="w-4 h-4" />
                       <span>Settings</span>
                     </Link>
@@ -234,9 +307,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       <SidebarInset>
         <Topbar />
-        <main className="flex-1 overflow-y-auto p-6">
-          {children}
-        </main>
+        <main className="flex-1 overflow-y-auto p-6">{children}</main>
       </SidebarInset>
     </SidebarProvider>
   );
