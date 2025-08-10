@@ -1,165 +1,254 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { loadAuth } from "@/lib/auth";
-import { createFarmer, deleteFarmer, getFarmersByZone, updateFarmer } from "@/lib/api";
-import { Farmer, User } from "@/lib/types";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
-type FormState = {
-  id?: string;
-  name: string;
-  phone: string;
-  language: string;
-};
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { getFarmersByZone, createFarmer, updateFarmer, deleteFarmer } from "@/lib/api";
+import { getCurrentUser } from "@/lib/auth";
+import { Farmer } from "@/lib/types";
+import { RouteGuard } from "@/components/auth/RouteGuard";
+import { Plus, Search, Edit, Trash2, User } from "lucide-react";
 
 export default function FarmersPage() {
-  const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
   const [farmers, setFarmers] = useState<Farmer[]>([]);
   const [search, setSearch] = useState("");
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState<FormState>({ name: "", phone: "", language: "" });
+  const [modal, setModal] = useState(false);
+  const [editingFarmer, setEditingFarmer] = useState<Partial<Farmer> | null>(null);
+  const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
-    const auth = loadAuth();
-    if (!auth) {
-      router.replace("/login");
-      return;
-    }
-    if (auth.user.role !== "zone_admin") {
-      router.replace("/dashboard");
-      return;
-    }
-    setUser(auth.user);
-  }, [router]);
+    const currentUser = getCurrentUser();
+    if (!currentUser || currentUser.role !== "zone_admin") return;
+    
+    setUser(currentUser);
+    loadFarmers();
+  }, []);
 
-  async function refresh() {
+  const loadFarmers = async () => {
     if (!user?.zoneId) return;
-    const res = await getFarmersByZone(user.zoneId);
-    setFarmers(res);
-  }
-
-  useEffect(() => {
-    refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
-
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase();
-    return farmers.filter((f) =>
-      [f.name, f.phone, f.language].some((v) => v.toLowerCase().includes(q))
-    );
-  }, [farmers, search]);
-
-  function openCreate() {
-    setForm({ name: "", phone: "", language: "" });
-    setOpen(true);
-  }
-
-  function openEdit(f: Farmer) {
-    setForm({ id: f.id, name: f.name, phone: f.phone, language: f.language });
-    setOpen(true);
-  }
-
-  async function save() {
-    if (!user?.zoneId) return;
-    if (!form.name.trim()) return;
-    if (form.id) {
-      await updateFarmer(form.id, { name: form.name, phone: form.phone, language: form.language });
-    } else {
-      await createFarmer({ name: form.name, phone: form.phone, language: form.language, zoneId: user.zoneId });
+    
+    try {
+      const data = await getFarmersByZone(user.zoneId);
+      setFarmers(data);
+    } catch (error) {
+      console.error("Failed to load farmers:", error);
     }
-    setOpen(false);
-    await refresh();
-  }
+  };
 
-  async function remove(id: string) {
-    await deleteFarmer(id);
-    await refresh();
-  }
+  const filteredFarmers = farmers.filter((farmer) =>
+    farmer.name.toLowerCase().includes(search.toLowerCase()) ||
+    farmer.phone.includes(search) ||
+    farmer.language.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user?.zoneId) return;
+
+    try {
+      if (editingFarmer?.id) {
+        // Update existing farmer
+        await updateFarmer(editingFarmer.id, editingFarmer);
+      } else {
+        // Create new farmer
+        await createFarmer({
+          ...editingFarmer!,
+          zoneId: user.zoneId,
+        } as Omit<Farmer, "id">);
+      }
+      
+      setModal(false);
+      setEditingFarmer(null);
+      loadFarmers();
+    } catch (error) {
+      console.error("Failed to save farmer:", error);
+    }
+  };
+
+  const handleEdit = (farmer: Farmer) => {
+    setEditingFarmer(farmer);
+    setModal(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this farmer?")) return;
+    
+    try {
+      await deleteFarmer(id);
+      loadFarmers();
+    } catch (error) {
+      console.error("Failed to delete farmer:", error);
+    }
+  };
+
+  const openCreateModal = () => {
+    setEditingFarmer({
+      name: "",
+      phone: "",
+      language: "English",
+      zoneId: user?.zoneId || "",
+    });
+    setModal(true);
+  };
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Farmers</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-            <Input placeholder="Search by name, phone, or language" value={search} onChange={(e) => setSearch(e.target.value)} />
-            <div className="flex gap-2">
-              <Button onClick={openCreate}>Add Farmer</Button>
-            </div>
+    <RouteGuard requiredRole="zone_admin">
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Farmers Management</h1>
+            <p className="text-muted-foreground">
+              Manage farmers in your assigned zone
+            </p>
           </div>
-        </CardContent>
-      </Card>
+          <Button onClick={openCreateModal} className="flex items-center gap-2">
+            <Plus className="w-4 h-4" />
+            Add Farmer
+          </Button>
+        </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>All Farmers</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Language</TableHead>
-                <TableHead>Zone</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((f) => (
-                <TableRow key={f.id}>
-                  <TableCell className="font-medium">{f.name}</TableCell>
-                  <TableCell>{f.phone}</TableCell>
-                  <TableCell>{f.language}</TableCell>
-                  <TableCell>{f.zoneId}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline" onClick={() => openEdit(f)}>Edit</Button>
-                      <Button size="sm" variant="destructive" onClick={() => remove(f.id)}>Delete</Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+        {/* Search */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search farmers by name, phone, or language..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+          </CardContent>
+        </Card>
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{form.id ? "Edit Farmer" : "Add Farmer"}</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-3">
-            <div>
-              <label className="block text-sm mb-1">Name</label>
-              <Input value={form.name} onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))} />
+        {/* Farmers Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Farmers</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              {filteredFarmers.length} farmer{filteredFarmers.length !== 1 ? 's' : ''} found
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Phone</TableHead>
+                    <TableHead>Language</TableHead>
+                    <TableHead>Zone</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredFarmers.map((farmer) => (
+                    <TableRow key={farmer.id}>
+                      <TableCell className="font-medium">{farmer.name}</TableCell>
+                      <TableCell>{farmer.phone}</TableCell>
+                      <TableCell>{farmer.language}</TableCell>
+                      <TableCell>{farmer.zoneId}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEdit(farmer)}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDelete(farmer.id)}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
-            <div>
-              <label className="block text-sm mb-1">Phone</label>
-              <Input value={form.phone} onChange={(e) => setForm((s) => ({ ...s, phone: e.target.value }))} />
-            </div>
-            <div>
-              <label className="block text-sm mb-1">Language</label>
-              <Input value={form.language} onChange={(e) => setForm((s) => ({ ...s, language: e.target.value }))} />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button onClick={save}>{form.id ? "Save Changes" : "Create"}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+          </CardContent>
+        </Card>
+
+        {/* Create/Edit Modal */}
+        <Dialog open={modal} onOpenChange={setModal}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {editingFarmer?.id ? "Edit Farmer" : "Add New Farmer"}
+              </DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Name</label>
+                <Input
+                  value={editingFarmer?.name || ""}
+                  onChange={(e) => setEditingFarmer({ ...editingFarmer, name: e.target.value })}
+                  placeholder="Farmer's full name"
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Phone Number</label>
+                <Input
+                  value={editingFarmer?.phone || ""}
+                  onChange={(e) => setEditingFarmer({ ...editingFarmer, phone: e.target.value })}
+                  placeholder="Phone number"
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Language</label>
+                <Select
+                  value={editingFarmer?.language || "English"}
+                  onValueChange={(value) => setEditingFarmer({ ...editingFarmer, language: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="English">English</SelectItem>
+                    <SelectItem value="Spanish">Spanish</SelectItem>
+                    <SelectItem value="French">French</SelectItem>
+                    <SelectItem value="German">German</SelectItem>
+                    <SelectItem value="Chinese">Chinese</SelectItem>
+                    <SelectItem value="Hindi">Hindi</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="flex justify-end gap-3 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setModal(false);
+                    setEditingFarmer(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit">
+                  {editingFarmer?.id ? "Update" : "Create"} Farmer
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </RouteGuard>
   );
 }
 

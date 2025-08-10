@@ -1,71 +1,65 @@
 "use client"
-import { useEffect, useMemo, useState } from "react"
-import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { cn } from "@/lib/utils"
-import { Home, Map, Bot, LogOut } from "lucide-react"
-import { loadAuth, logout } from "@/lib/auth"
 
-type NavItem = { href: string; label: string; icon: any }
+import { SidebarProvider, Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarRail, SidebarSeparator, SidebarTrigger } from "@/components/ui/sidebar";
+import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 
-export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
-  const pathname = usePathname()
-  const [role, setRole] = useState<string | null>(null)
+export function SidebarComponent() {
+  const { user, logout } = useAuth();
 
-  useEffect(() => {
-    const auth = loadAuth()
-    setRole(auth?.user.role ?? null)
-  }, [])
-
-  const items: NavItem[] = useMemo(() => {
-    if (role === "central_admin") {
-      return [
-        { href: "/dashboard", label: "Dashboard", icon: Home },
-        { href: "/dashboard", label: "Zones", icon: Map },
-      ]
-    }
-    if (role === "zone_admin") {
-      return [
-        { href: "/dashboard", label: "Dashboard", icon: Home },
-        { href: "/zone-data", label: "Zone Data", icon: Map },
-        { href: "/farmers", label: "Farmers", icon: Map },
-      ]
-    }
-    return [
-      { href: "/dashboard", label: "Dashboard", icon: Home },
-      { href: "/dashboard", label: "Zones", icon: Map },
-    ]
-  }, [role])
+  const handleLogout = async () => {
+    await logout();
+  };
 
   return (
-    <div className="h-full flex flex-col gap-2 p-2">
-      <div className="px-2 py-3 text-sm font-semibold">Crop AI</div>
-      <nav className="flex-1 space-y-1">
-        {items.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href || (href !== "/" && pathname.startsWith(href))
-          return (
-            <Link key={href} href={href} onClick={onNavigate} className={cn(
-              "flex items-center gap-2 rounded-md px-2 py-2 text-sm hover:bg-accent",
-              active ? "bg-accent" : undefined
-            )}>
-              <Icon className="size-4" />
-              <span className="hidden md:inline">{label}</span>
-            </Link>
-          )
-        })}
-      </nav>
-      <button
-        className="flex items-center gap-2 rounded-md px-2 py-2 text-sm hover:bg-accent"
-        onClick={() => {
-          logout();
-          window.location.href = "/login";
-        }}
-      >
-        <LogOut className="size-4" />
-        <span className="hidden md:inline">Logout</span>
-      </button>
-    </div>
-  )
+    <SidebarProvider>
+      <Sidebar collapsible="icon">
+        <SidebarHeader>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary text-primary-foreground">
+                    <span className="text-lg font-bold">C</span>
+                  </div>
+                  <span className="font-semibold text-lg">CropAI</span>
+                </div>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarHeader>
+        
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton>
+                    Dashboard
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
+        
+        <SidebarFooter>
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton onClick={handleLogout}>
+                    Logout
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarFooter>
+      </Sidebar>
+    </SidebarProvider>
+  );
 }
 
 
