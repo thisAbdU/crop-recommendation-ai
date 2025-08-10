@@ -42,8 +42,8 @@ class User(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
-    zone = db.relationship('Zone', backref='users')
-    assigned_iots = db.relationship('IoT', backref='assigned_technician')
+    zone = db.relationship('Zone', backref='zone_users', foreign_keys=[zone_id])
+    assigned_iots = db.relationship('IoT', backref='assigned_technician', foreign_keys='IoT.assigned_to_technician_id')
     created_recommendations = db.relationship('Recommendation', backref='created_by_user', foreign_keys='Recommendation.created_by')
     approved_recommendations = db.relationship('Recommendation', backref='approved_by_user', foreign_keys='Recommendation.approved_by')
     prompt_templates = db.relationship('PromptTemplate', backref='owner')
@@ -60,9 +60,9 @@ class Zone(db.Model):
     zone_admin_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
+    zone_type = db.Column(db.String(64), nullable=True)
     # Relationships
-    zone_admin = db.relationship('User', foreign_keys=[zone_admin_id])
+    zone_admin = db.relationship('User', foreign_keys=[zone_admin_id], backref='administered_zones')
     iots = db.relationship('IoT', backref='zone', cascade='all, delete-orphan')
     land_conditions = db.relationship('ZoneLandCondition', backref='zone', cascade='all, delete-orphan')
     recommendations = db.relationship('Recommendation', backref='zone', cascade='all, delete-orphan')
@@ -98,6 +98,9 @@ class ZoneLandCondition(db.Model):
     rainfall = db.Column(db.Float, nullable=True)
     soil_type = db.Column(db.String(64), nullable=True)
     device_tag = db.Column(db.String(255), nullable=True)
+    wind_speed = db.Column(db.Float, nullable=True)
+    pressure = db.Column(db.Float, nullable=True)
+    description = db.Column(db.String(255), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Recommendation(db.Model):
@@ -118,7 +121,12 @@ class Recommendation(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     approved_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     approved_at = db.Column(db.DateTime, nullable=True)
-    
+    recommendation_data = db.Column(JSONB, nullable=True)
+    generated_at = db.Column(db.DateTime, default=datetime.utcnow)
+    data_start_date = db.Column(db.DateTime, nullable=True)
+    data_end_date = db.Column(db.DateTime, nullable=True)
+    ai_model_version = db.Column(db.String(64), nullable=True)
+    confidence_score = db.Column(db.Float, nullable=True)
     # Relationships
     prompt_template = db.relationship('PromptTemplate', backref='recommendations')
     chat_threads = db.relationship('ChatThread', backref='recommendation', cascade='all, delete-orphan')
