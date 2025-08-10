@@ -20,17 +20,20 @@ RUN apt-get update \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy project
+# Copy project (this should include ai_model folder)
 COPY . .
 
 # Create necessary directories
-RUN mkdir -p /app/prompts /app/logs /srv/models
+RUN mkdir -p /app/prompts /app/logs /app/ai_model
 
 # Create non-root user
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 
-# Ensure prompts directory has correct permissions
+# Ensure all directories have correct permissions
 RUN chown -R appuser:appuser /app/prompts && chmod 755 /app/prompts
+RUN chown -R appuser:appuser /app/logs && chmod 755 /app/logs
+RUN chown -R appuser:appuser /app/ai_model && chmod 755 /app/ai_model
+
 USER appuser
 
 # Expose port

@@ -18,29 +18,58 @@ class AIClient:
     def _init_local_client(self):
         """Initialize local AI client using the ML model from ai_model folder"""
         try:
-            # Load the ML model and scaler from ai_model folder
+            # Get the model path from config
+            config_path = current_app.config.get('AGRI_AI_MODEL_PATH', 'ai_model')
+            
+            # Use the config path directly if it's absolute, otherwise make it relative to app root
+            if os.path.isabs(config_path):
+                self.model_path = config_path
+            else:
+                # Get the app root directory (where the Flask app runs)
+                app_root = current_app.root_path
+                self.model_path = os.path.join(app_root, config_path)
+            
+            # Load the ML model and scaler
             model_file = os.path.join(self.model_path, 'model', 'crop_rec_model.pkl')
             scaler_file = os.path.join(self.model_path, 'model', 'scaler.pkl')
             
-            logger.info(f"Model file path: {model_file}")
-            logger.info(f"Scaler file path: {scaler_file}")
+            logger.info(f"=== AI Client Initialization ===")
+            logger.info(f"Config model path: {config_path}")
+            logger.info(f"Resolved model path: {self.model_path}")
+            logger.info(f"Looking for ML model files:")
+            logger.info(f"  Model file: {model_file}")
+            logger.info(f"  Scaler file: {scaler_file}")
+            logger.info(f"  Current working directory: {os.getcwd()}")
+            logger.info(f"  App root path: {current_app.root_path}")
+            logger.info(f"  Model path exists: {os.path.exists(self.model_path)}")
+            logger.info(f"  Model file exists: {os.path.exists(model_file)}")
+            logger.info(f"  Scaler file exists: {os.path.exists(scaler_file)}")
+            
+            # List contents for debugging
+            if os.path.exists(self.model_path):
+                logger.info(f"Contents of {self.model_path}: {os.listdir(self.model_path)}")
+                model_dir = os.path.join(self.model_path, 'model')
+                if os.path.exists(model_dir):
+                    logger.info(f"Contents of {model_dir}: {os.listdir(model_dir)}")
             
             if os.path.exists(model_file) and os.path.exists(scaler_file):
                 self.model = joblib.load(model_file)
                 self.scaler = joblib.load(scaler_file)
-                self.crop_classes = self.model.classes_ if hasattr(self.model, 'classes_') else None
-                logger.info("ML model and scaler loaded successfully")
+                self.ai_mode = 'local'
+                logger.info("✅ Local ML model loaded successfully!")
             else:
-                logger.warning("ML model files not found in ai_model folder, using mock implementation")
+                logger.warning(f"❌ ML model files not found, using mock implementation")
                 self.model = None
                 self.scaler = None
-                self.crop_classes = None
+                self.ai_mode = 'mock'
                 
         except Exception as e:
-            logger.error(f"Failed to load ML model from ai_model folder: {str(e)}")
+            logger.error(f"❌ Failed to load ML model: {str(e)}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             self.model = None
             self.scaler = None
-            self.crop_classes = None
+            self.ai_mode = 'mock'
     
     def generate_crop_recommendation(self, sensor_data, weather_data=None, zone_info=None):
         """

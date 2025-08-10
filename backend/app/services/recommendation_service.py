@@ -323,8 +323,8 @@ class RecommendationService:
             weather_data = ZoneLandCondition.query.filter(
                 and_(
                     ZoneLandCondition.zone_id == zone_id,
-                    ZoneLandCondition.timestamp >= start_date,
-                    ZoneLandCondition.timestamp <= end_date
+                    ZoneLandCondition.read_from_iot_at >= start_date,
+                    ZoneLandCondition.read_from_iot_at <= end_date
                 )
             ).all()
             
