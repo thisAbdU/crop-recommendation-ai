@@ -11,29 +11,29 @@ import { AuthService } from "@/services/authService";
 
 export default function LoginPage() {
   const [activeTab, setActiveTab] = useState("login");
-  
+
   // Login state
   const [email, setEmail] = useState("ivy@example.com");
   const [password, setPassword] = useState("password");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  
+
   // Signup state
   const [signupData, setSignupData] = useState({
-    firstName: "",
-    lastName: "",
+    first_name: "",
+    last_name: "",
     email: "",
     password: "",
     confirmPassword: "",
-    company: "",
-    phone: ""
+    role: "",
+    phone_number: "",
   });
   const [showSignupPassword, setShowSignupPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [signupError, setSignupError] = useState<string | null>(null);
   const [isSignupLoading, setIsSignupLoading] = useState(false);
-  
+
   const router = useRouter();
   const { login, demoLogin, user } = useAuth();
 
@@ -46,7 +46,7 @@ export default function LoginPage() {
       const success = await login(email, password);
       if (success) {
         // Get user info to determine role-based redirect
-        const userInfo = localStorage.getItem('user_info');
+        const userInfo = localStorage.getItem("user_info");
         if (userInfo) {
           const user = JSON.parse(userInfo);
           // Redirect based on user role
@@ -81,49 +81,53 @@ export default function LoginPage() {
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault();
     setSignupError(null);
-    
+
     // Basic validation
     if (signupData.password !== signupData.confirmPassword) {
       setSignupError("Passwords do not match.");
       return;
     }
-    
+
     if (signupData.password.length < 6) {
       setSignupError("Password must be at least 6 characters long.");
       return;
     }
-    
+
     setIsSignupLoading(true);
-    
+
     try {
       // Call the real signup API
       const response = await AuthService.signup({
-        firstName: signupData.firstName,
-        lastName: signupData.lastName,
+        first_name: signupData.first_name,
+        last_name: signupData.last_name,
         email: signupData.email,
         password: signupData.password,
-        company: signupData.company,
-        phone: signupData.phone
+        phone_number: signupData.phone_number,
+        role: "INVESTER",
       });
-      
+
       if (response) {
         // Redirect to login tab with success message
         setActiveTab("login");
         setError("Account created successfully! Please sign in.");
-        
+
         // Clear signup form
         setSignupData({
-          firstName: "",
-          lastName: "",
+          first_name: "",
+          last_name: "",
           email: "",
           password: "",
           confirmPassword: "",
-          company: "",
-          phone: ""
+          role: "",
+          phone_number: "",
         });
       }
     } catch (err) {
-      setSignupError(err instanceof Error ? err.message : "An error occurred during signup. Please try again.");
+      setSignupError(
+        err instanceof Error
+          ? err.message
+          : "An error occurred during signup. Please try again."
+      );
       console.error("Signup error:", err);
     } finally {
       setIsSignupLoading(false);
@@ -142,15 +146,23 @@ export default function LoginPage() {
       // Use the new demoLogin function from AuthContext
       const success = await demoLogin(role);
       console.log("✅ demoLogin result:", success);
-      
+
       if (success) {
-        console.log("🎉 Demo login successful, redirecting to role-specific dashboard...");
-        
+        console.log(
+          "🎉 Demo login successful, redirecting to role-specific dashboard..."
+        );
+
         // Debug: Check localStorage and user state
-        console.log("🔍 localStorage user_info:", localStorage.getItem('user_info'));
-        console.log("🔍 localStorage auth_token:", localStorage.getItem('auth_token'));
+        console.log(
+          "🔍 localStorage user_info:",
+          localStorage.getItem("user_info")
+        );
+        console.log(
+          "🔍 localStorage auth_token:",
+          localStorage.getItem("auth_token")
+        );
         console.log("🔍 Current user from context:", user);
-        
+
         // Redirect based on user role
         switch (role) {
           case "zone_admin":
@@ -190,18 +202,28 @@ export default function LoginPage() {
           </p>
         </CardHeader>
         <CardContent>
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <Tabs
+            value={activeTab}
+            onValueChange={setActiveTab}
+            className="w-full"
+          >
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="login" className="flex items-center space-x-2">
+              <TabsTrigger
+                value="login"
+                className="flex items-center space-x-2"
+              >
                 <LogIn className="w-4 h-4" />
                 <span>Sign In</span>
               </TabsTrigger>
-              <TabsTrigger value="signup" className="flex items-center space-x-2">
+              <TabsTrigger
+                value="signup"
+                className="flex items-center space-x-2"
+              >
                 <UserPlus className="w-4 h-4" />
                 <span>Sign Up</span>
               </TabsTrigger>
             </TabsList>
-            
+
             {/* Login Tab */}
             <TabsContent value="login" className="space-y-4 mt-6">
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -211,6 +233,13 @@ export default function LoginPage() {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    required
+                    disabled={isLoading}
+                  />
+                  <Input
+                    value="INVESTER"
+                    hidden
+                    name="role"
                     required
                     disabled={isLoading}
                   />
@@ -302,65 +331,77 @@ export default function LoginPage() {
                 </div>
               </div>
             </TabsContent>
-            
+
             {/* Signup Tab */}
             <TabsContent value="signup" className="space-y-4 mt-6">
               <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
                 <p className="text-sm text-blue-700 text-center">
-                  <strong>Investor Signup Only</strong><br />
+                  <strong>Investor Signup Only</strong>
+                  <br />
                   Create your account to access agricultural investment insights
                 </p>
               </div>
-              
+
               <form onSubmit={handleSignup} className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                   <Input
                     placeholder="First Name"
-                    value={signupData.firstName}
-                    onChange={(e) => setSignupData({...signupData, firstName: e.target.value})}
+                    value={signupData.first_name}
+                    onChange={(e) =>
+                      setSignupData({
+                        ...signupData,
+                        first_name: e.target.value,
+                      })
+                    }
                     required
                     disabled={isSignupLoading}
                   />
                   <Input
                     placeholder="Last Name"
-                    value={signupData.lastName}
-                    onChange={(e) => setSignupData({...signupData, lastName: e.target.value})}
+                    value={signupData.last_name}
+                    onChange={(e) =>
+                      setSignupData({
+                        ...signupData,
+                        last_name: e.target.value,
+                      })
+                    }
                     required
                     disabled={isSignupLoading}
                   />
                 </div>
-                
+
                 <Input
                   placeholder="Email"
                   type="email"
                   value={signupData.email}
-                  onChange={(e) => setSignupData({...signupData, email: e.target.value})}
+                  onChange={(e) =>
+                    setSignupData({ ...signupData, email: e.target.value })
+                  }
                   required
                   disabled={isSignupLoading}
                 />
-                
-                <Input
-                  placeholder="Company Name"
-                  value={signupData.company}
-                  onChange={(e) => setSignupData({...signupData, company: e.target.value})}
-                  required
-                  disabled={isSignupLoading}
-                />
-                
+
                 <Input
                   placeholder="Phone Number"
                   type="tel"
-                  value={signupData.phone}
-                  onChange={(e) => setSignupData({...signupData, phone: e.target.value})}
+                  value={signupData.phone_number}
+                  onChange={(e) =>
+                    setSignupData({
+                      ...signupData,
+                      phone_number: e.target.value,
+                    })
+                  }
                   disabled={isSignupLoading}
                 />
-                
+
                 <div className="relative">
                   <Input
                     placeholder="Password"
                     type={showSignupPassword ? "text" : "password"}
                     value={signupData.password}
-                    onChange={(e) => setSignupData({...signupData, password: e.target.value})}
+                    onChange={(e) =>
+                      setSignupData({ ...signupData, password: e.target.value })
+                    }
                     required
                     disabled={isSignupLoading}
                   />
@@ -377,13 +418,18 @@ export default function LoginPage() {
                     )}
                   </button>
                 </div>
-                
+
                 <div className="relative">
                   <Input
                     placeholder="Confirm Password"
                     type={showConfirmPassword ? "text" : "password"}
                     value={signupData.confirmPassword}
-                    onChange={(e) => setSignupData({...signupData, confirmPassword: e.target.value})}
+                    onChange={(e) =>
+                      setSignupData({
+                        ...signupData,
+                        confirmPassword: e.target.value,
+                      })
+                    }
                     required
                     disabled={isSignupLoading}
                   />
@@ -407,7 +453,11 @@ export default function LoginPage() {
                   </div>
                 )}
 
-                <Button className="w-full" type="submit" disabled={isSignupLoading}>
+                <Button
+                  className="w-full"
+                  type="submit"
+                  disabled={isSignupLoading}
+                >
                   {isSignupLoading ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
