@@ -31,6 +31,7 @@ class ZoneSchema(Schema):
     latitude = fields.Decimal(places=7)
     longitude = fields.Decimal(places=7)
     area_hectare = fields.Decimal(places=3)
+    zone_type = fields.Str(validate=validate.Length(max=64))
     zone_admin_id = fields.Int()
     created_at = fields.DateTime(dump_only=True)
     updated_at = fields.DateTime(dump_only=True)
@@ -62,6 +63,9 @@ class ZoneLandConditionSchema(Schema):
     rainfall = fields.Float()
     soil_type = fields.Str(validate=validate.Length(max=64))
     device_tag = fields.Str(validate=validate.Length(max=255))
+    wind_speed = fields.Float()
+    pressure = fields.Float()
+    description = fields.Str(validate=validate.Length(max=255))
     created_at = fields.DateTime(dump_only=True)
 
 class SensorIngestSchema(Schema):

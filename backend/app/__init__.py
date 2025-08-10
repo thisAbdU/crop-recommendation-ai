@@ -51,7 +51,7 @@ def create_app(config_name=None):
     from app.api.zones import zones_bp
     from app.api.iot import iot_bp
     from app.api.data import data_bp
-    from app.api.recommendations import recommendations_bp
+    from app.api.recommendations import recommendations_bp, blp as recommendations_blp
     from app.api.chat import chat_bp
     from app.api.prompts import prompts_bp
     from app.api.health import health_bp, blp as health_blp
@@ -60,6 +60,7 @@ def create_app(config_name=None):
     api.register_blueprint(auth_blp, url_prefix='/api/auth')
     api.register_blueprint(health_blp, url_prefix='/api')
     api.register_blueprint(users_blp, url_prefix='/api/users')
+    api.register_blueprint(recommendations_blp, url_prefix='/api/recommendations')
     
     # Register regular blueprints for other endpoints
     app.register_blueprint(zones_bp, url_prefix='/api/zones')

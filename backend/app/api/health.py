@@ -1,8 +1,6 @@
 from flask import Blueprint, jsonify
 from flask_smorest import Blueprint as SmorestBlueprint, abort
 from app import db
-import redis
-import requests
 from datetime import datetime
 import os
 

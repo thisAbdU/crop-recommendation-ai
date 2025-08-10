@@ -1,6 +1,4 @@
 import os
-import requests
-import json
 import joblib
 import pandas as pd
 import numpy as np
@@ -11,25 +9,21 @@ from datetime import datetime, timedelta
 logger = logging.getLogger(__name__)
 
 class AIClient:
-    """Enhanced AI client for crop recommendation using ML models and external APIs"""
+    """AI client for crop recommendation using local ML models from ai_model folder"""
     
     def __init__(self):
-        self.ai_mode = current_app.config.get('AI_MODE', 'local')
-        self.model_path = current_app.config.get('AGRI_AI_MODEL_PATH', 'ai_model/model')
-        self.remote_url = current_app.config.get('AI_REMOTE_URL')
-        self.gemini_api_key = current_app.config.get('GEMINI_API_KEY')
-        
-        if self.ai_mode == 'local':
-            self._init_local_client()
-        else:
-            self._init_remote_client()
+        self.model_path = current_app.config.get('AGRI_AI_MODEL_PATH', 'ai_model')
+        self._init_local_client()
     
     def _init_local_client(self):
         """Initialize local AI client using the ML model from ai_model folder"""
         try:
-            # Try to load the ML model and scaler
-            model_file = os.path.join(self.model_path, 'crop_rec_model.pkl')
-            scaler_file = os.path.join(self.model_path, 'scaler.pkl')
+            # Load the ML model and scaler from ai_model folder
+            model_file = os.path.join(self.model_path, 'model', 'crop_rec_model.pkl')
+            scaler_file = os.path.join(self.model_path, 'model', 'scaler.pkl')
+            
+            logger.info(f"Model file path: {model_file}")
+            logger.info(f"Scaler file path: {scaler_file}")
             
             if os.path.exists(model_file) and os.path.exists(scaler_file):
                 self.model = joblib.load(model_file)
@@ -37,22 +31,16 @@ class AIClient:
                 self.crop_classes = self.model.classes_ if hasattr(self.model, 'classes_') else None
                 logger.info("ML model and scaler loaded successfully")
             else:
-                logger.warning("ML model files not found, using mock implementation")
+                logger.warning("ML model files not found in ai_model folder, using mock implementation")
                 self.model = None
                 self.scaler = None
                 self.crop_classes = None
                 
         except Exception as e:
-            logger.error(f"Failed to load ML model: {str(e)}")
+            logger.error(f"Failed to load ML model from ai_model folder: {str(e)}")
             self.model = None
             self.scaler = None
             self.crop_classes = None
-    
-    def _init_remote_client(self):
-        """Initialize remote AI client"""
-        if not self.remote_url:
-            raise ValueError("AI_REMOTE_URL must be set for remote AI mode")
-        logger.info(f"Remote AI client initialized with URL: {self.remote_url}")
     
     def generate_crop_recommendation(self, sensor_data, weather_data=None, zone_info=None):
         """
@@ -67,16 +55,17 @@ class AIClient:
             dict: Recommendation with top 3 crops and analysis
         """
         try:
-            if self.ai_mode == 'local' and self.model and self.scaler:
+            if self.model and self.scaler:
                 return self._generate_local_recommendation(sensor_data, weather_data, zone_info)
             else:
-                return self._generate_remote_recommendation(sensor_data, weather_data, zone_info)
+                logger.warning("ML model not available, using mock recommendation")
+                return self._mock_generate_recommendation(sensor_data, weather_data, zone_info)
         except Exception as e:
             logger.error(f"Error generating crop recommendation: {str(e)}")
             return self._mock_generate_recommendation(sensor_data, weather_data, zone_info)
     
     def _generate_local_recommendation(self, sensor_data, weather_data, zone_info):
-        """Generate recommendation using local ML model"""
+        """Generate recommendation using local ML model from ai_model folder"""
         try:
             # Prepare features for the model
             features = self._prepare_features(sensor_data, weather_data)
@@ -201,7 +190,7 @@ class AIClient:
             texture = 'Sandy'
         elif moisture < 35:
             texture = 'Loamy'
-            else:
+        else:
             texture = 'Clay'
         
         return f"{texture} {base_type}"
@@ -243,7 +232,7 @@ class AIClient:
             rationale += "and optimal temperature conditions."
         elif 15 <= temp < 20 or 30 < temp <= 35:
             rationale += "and acceptable temperature conditions."
-            else:
+        else:
             rationale += "and temperature conditions may need monitoring."
         
         return rationale
@@ -313,7 +302,7 @@ class AIClient:
             return "Moderate"
         elif moisture < 45:
             return "Moist"
-            else:
+        else:
             return "Very Moist"
     
     def _assess_data_quality(self, sensor_data):
@@ -348,27 +337,8 @@ class AIClient:
             'recommendation': 'High quality data' if quality_score >= 90 else 'Good quality data' if quality_score >= 70 else 'Moderate quality data' if quality_score >= 50 else 'Poor quality data - verification recommended'
         }
     
-    def _generate_remote_recommendation(self, sensor_data, weather_data, zone_info):
-        """Generate recommendation using remote AI service"""
-        payload = {
-            'sensor_data': sensor_data,
-            'weather_data': weather_data,
-            'zone_info': zone_info
-        }
-        
-        response = requests.post(
-            f"{self.remote_url}/generate_crop_recommendation",
-            json=payload,
-            timeout=300
-        )
-        
-        if response.status_code != 200:
-            raise Exception(f"Remote AI service error: {response.status_code} - {response.text}")
-        
-        return response.json()
-    
     def _mock_generate_recommendation(self, sensor_data, weather_data, zone_info):
-        """Mock recommendation generation for development/testing"""
+        """Mock recommendation generation for development/testing when ML model is not available"""
         import random
         
         # Mock crops based on features
@@ -443,13 +413,9 @@ class AIClient:
         }
     
     def test_connection(self):
-        """Test connection to AI service"""
+        """Test connection to local AI service"""
         try:
-            if self.ai_mode == 'local':
-                return self.model is not None and self.scaler is not None
-        else:
-                response = requests.get(f"{self.remote_url}/health", timeout=10)
-                return response.status_code == 200
+            return self.model is not None and self.scaler is not None
         except Exception as e:
-            logger.error(f"AI service connection test failed: {str(e)}")
+            logger.error(f"Local AI service connection test failed: {str(e)}")
             return False 

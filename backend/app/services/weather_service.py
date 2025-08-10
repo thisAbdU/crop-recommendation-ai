@@ -10,6 +10,7 @@ class WeatherService:
     
     def __init__(self):
         self.api_key = current_app.config.get('OPENWEATHER_API_KEY')
+        logger.info(f"OpenWeather API key: {self.api_key}")
         self.base_url = 'https://api.openweathermap.org/data/2.5'
         
         if not self.api_key:

@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, desc, func
 import json
 
-from ..models import db, Recommendation, Zone, SensorData, WeatherData, User
+from ..models import db, Recommendation, Zone, ZoneLandCondition
 from .ai_client import AIClient
 from .weather_service import WeatherService
 from .iot_service import IoTService
@@ -23,53 +23,58 @@ class RecommendationService:
     def generate_recommendation_from_zone(self, zone_id: int, user_id: int, 
                                         start_date: Optional[datetime] = None, 
                                         end_date: Optional[datetime] = None) -> Dict[str, Any]:
-        """
-        Generate crop recommendation for a specific zone using historical data
-        
-        Args:
-            zone_id: ID of the zone
-            user_id: ID of the user requesting the recommendation
-            start_date: Start date for data aggregation (defaults to 7 days ago)
-            end_date: End date for data aggregation (defaults to now)
-            
-        Returns:
-            Dict containing the recommendation data
-        """
+        """Generate crop recommendation for a zone using historical data"""
         try:
+            logger.info(f"Starting recommendation generation for zone {zone_id}, user {user_id}")
+            logger.info(f"Date range: {start_date} to {end_date}")
+            
             # Set default dates if not provided
+            if not start_date:
+                start_date = datetime.utcnow() - timedelta(days=30)
+                logger.info(f"Using default start_date: {start_date}")
+            
             if not end_date:
                 end_date = datetime.utcnow()
-            if not start_date:
-                start_date = end_date - timedelta(days=7)
+                logger.info(f"Using default end_date: {end_date}")
             
             # Get zone information
             zone = Zone.query.get(zone_id)
             if not zone:
+                logger.error(f"Zone {zone_id} not found")
                 raise ValueError(f"Zone {zone_id} not found")
             
-            # Get aggregated sensor data for the zone
-            aggregated_data = self._get_aggregated_zone_data(zone_id, start_date, end_date)
+            logger.info(f"Found zone: {zone.name}")
             
-            # Get weather data for the zone
+            # Get aggregated sensor data
+            logger.info("Getting aggregated zone data...")
+            aggregated_data = self._get_aggregated_zone_data(zone_id, start_date, end_date)
+            logger.info(f"Aggregated data keys: {list(aggregated_data.keys())}")
+            
+            # Get weather data
+            logger.info("Getting zone weather data...")
             weather_data = self._get_zone_weather_data(zone_id, start_date, end_date)
+            logger.info(f"Weather data keys: {list(weather_data.keys()) if weather_data else 'No weather data'}")
             
             # Generate recommendation using AI
+            logger.info("Calling AI client...")
             ai_result = self.ai_client.generate_crop_recommendation(
                 sensor_data=aggregated_data,
                 weather_data=weather_data,
                 zone_info={
                     'zone_id': zone_id,
                     'zone_name': zone.name,
-                    'zone_type': zone.zone_type,
-                    'area': zone.area,
-                    'location': zone.location
+                    'zone_type': 'farm',  # Default value
+                    'area': f"{zone.area_hectare} hectares" if zone.area_hectare else "Unknown",
+                    'location': f"Lat: {zone.latitude}, Long: {zone.longitude}" if zone.latitude and zone.longitude else "Unknown"
                 }
             )
+            logger.info("AI client returned result successfully")
             
             # Create recommendation record
+            logger.info("Creating recommendation record...")
             recommendation = Recommendation(
                 zone_id=zone_id,
-                user_id=user_id,
+                created_by=user_id,
                 recommendation_data=ai_result,
                 generated_at=datetime.utcnow(),
                 data_start_date=start_date,
@@ -80,6 +85,7 @@ class RecommendationService:
             
             db.session.add(recommendation)
             db.session.commit()
+            logger.info(f"Recommendation record created with ID: {recommendation.id}")
             
             logger.info(f"Generated recommendation for zone {zone_id} with confidence {ai_result.get('confidence', 0.0)}")
             
@@ -95,6 +101,9 @@ class RecommendationService:
             
         except Exception as e:
             logger.error(f"Error generating recommendation for zone {zone_id}: {str(e)}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            import traceback
+            logger.error(f"Full traceback: {traceback.format_exc()}")
             db.session.rollback()
             raise
     
@@ -126,7 +135,7 @@ class RecommendationService:
             if user_id and zone_info and zone_info.get('zone_id'):
                 recommendation = Recommendation(
                     zone_id=zone_info['zone_id'],
-                    user_id=user_id,
+                    created_by=user_id,
                     recommendation_data=ai_result,
                     generated_at=datetime.utcnow(),
                     data_start_date=datetime.utcnow(),
@@ -234,11 +243,11 @@ class RecommendationService:
         """Get aggregated sensor data for a zone within a date range"""
         try:
             # Get all sensor data for the zone in the date range
-            sensor_data = SensorData.query.filter(
+            sensor_data = ZoneLandCondition.query.filter(
                 and_(
-                    SensorData.zone_id == zone_id,
-                    SensorData.timestamp >= start_date,
-                    SensorData.timestamp <= end_date
+                    ZoneLandCondition.zone_id == zone_id,
+                    ZoneLandCondition.created_at >= start_date,
+                    ZoneLandCondition.created_at <= end_date
                 )
             ).all()
             
@@ -311,11 +320,11 @@ class RecommendationService:
         """Get weather data for a zone within a date range"""
         try:
             # Get weather data for the zone in the date range
-            weather_data = WeatherData.query.filter(
+            weather_data = ZoneLandCondition.query.filter(
                 and_(
-                    WeatherData.zone_id == zone_id,
-                    WeatherData.timestamp >= start_date,
-                    WeatherData.timestamp <= end_date
+                    ZoneLandCondition.zone_id == zone_id,
+                    ZoneLandCondition.timestamp >= start_date,
+                    ZoneLandCondition.timestamp <= end_date
                 )
             ).all()
             
@@ -323,7 +332,7 @@ class RecommendationService:
                 return {}
             
             # Aggregate weather data (use most recent values for current conditions)
-            latest_weather = max(weather_data, key=lambda x: x.timestamp)
+            latest_weather = max(weather_data, key=lambda x: x.created_at)
             
             return {
                 'temperature': latest_weather.temperature,
@@ -332,7 +341,7 @@ class RecommendationService:
                 'wind_speed': latest_weather.wind_speed,
                 'pressure': latest_weather.pressure,
                 'description': latest_weather.description,
-                'timestamp': latest_weather.timestamp.isoformat()
+                'created_at': latest_weather.created_at.isoformat()
             }
             
         except Exception as e:
