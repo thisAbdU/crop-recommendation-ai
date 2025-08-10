@@ -1,173 +1,238 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { loadAuth } from "@/lib/auth";
-import { getSensorDataByZone } from "@/lib/api";
-import { SensorDataPoint, User } from "@/lib/types";
+
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { getSensorDataByZone } from "@/lib/api";
+import { getCurrentUser } from "@/lib/auth";
+import { SensorDataPoint } from "@/lib/types";
+import { RouteGuard } from "@/components/auth/RouteGuard";
+import { Download, Search, Calendar } from "lucide-react";
 
 export default function ZoneDataPage() {
-  const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [data, setData] = useState<SensorDataPoint[]>([]);
-  const [from, setFrom] = useState<string>("");
-  const [to, setTo] = useState<string>("");
-  const [search, setSearch] = useState<string>("");
-  const [page, setPage] = useState<number>(1);
-  const pageSize = 10;
+  const [sensorData, setSensorData] = useState<SensorDataPoint[]>([]);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [search, setSearch] = useState("");
+  const [pagination, setPagination] = useState({ page: 1, limit: 10 });
+  const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
-    const auth = loadAuth();
-    if (!auth) {
-      router.replace("/login");
-      return;
+    const currentUser = getCurrentUser();
+    if (!currentUser || currentUser.role !== "zone_admin") return;
+    
+    setUser(currentUser);
+    loadSensorData();
+  }, []);
+
+  const loadSensorData = async () => {
+    if (!user?.zoneId) return;
+    
+    try {
+      const data = await getSensorDataByZone(user.zoneId, startDate || undefined, endDate || undefined);
+      setSensorData(data);
+    } catch (error) {
+      console.error("Failed to load sensor data:", error);
     }
-    if (auth.user.role !== "zone_admin") {
-      router.replace("/dashboard");
-      return;
-    }
-    setUser(auth.user);
-  }, [router]);
+  };
 
   useEffect(() => {
-    async function run() {
-      if (!user?.zoneId) return;
-      const res = await getSensorDataByZone(user.zoneId, from || undefined, to || undefined);
-      setData(res);
-      setPage(1);
+    if (user?.zoneId) {
+      loadSensorData();
     }
-    run();
-  }, [user, from, to]);
+  }, [startDate, endDate, user]);
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return data;
-    return data.filter((d) => {
-      return [
-        d.ph.toString(),
-        d.soil_moisture.toString(),
-        d.temperature.toString(),
-        d.humidity.toString(),
-        d.rainfall.toString(),
-      ].some((v) => v.toLowerCase().includes(q));
-    });
-  }, [data, search]);
+  const filteredData = sensorData.filter((item) =>
+    Object.values(item).some((value) =>
+      value.toString().toLowerCase().includes(search.toLowerCase())
+    )
+  );
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const pageItems = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const paginatedData = filteredData.slice(
+    (pagination.page - 1) * pagination.limit,
+    pagination.page * pagination.limit
+  );
 
-  function exportCsv() {
+  const totalPages = Math.ceil(filteredData.length / pagination.limit);
+
+  const exportToCSV = () => {
     const headers = [
-      "Timestamp",
-      "Soil Moisture",
+      "Date",
+      "Soil Moisture (%)",
       "pH",
-      "Temperature",
-      "Humidity",
-      "Phosphorus",
-      "Potassium",
-      "Nitrogen",
-      "Rainfall",
+      "Temperature (°C)",
+      "Phosphorus (ppm)",
+      "Potassium (ppm)",
+      "Humidity (%)",
+      "Nitrogen (ppm)",
+      "Rainfall (mm)",
     ];
-    const rows = filtered.map((d) => [
-      d.read_from_iot_at,
-      d.soil_moisture,
-      d.ph,
-      d.temperature,
-      d.humidity,
-      d.phosphorus,
-      d.potassium,
-      d.nitrogen,
-      d.rainfall,
-    ]);
-    const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
+
+    const csvContent = [
+      headers.join(","),
+      ...filteredData.map((item) =>
+        [
+          new Date(item.read_from_iot_at).toLocaleDateString(),
+          item.soil_moisture,
+          item.ph,
+          item.temperature,
+          item.phosphorus,
+          item.potassium,
+          item.humidity,
+          item.nitrogen,
+          item.rainfall,
+        ].join(",")
+      ),
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "zone-data.csv";
+    a.download = `zone-data-${new Date().toISOString().split("T")[0]}.csv`;
     a.click();
-    URL.revokeObjectURL(url);
-  }
+    window.URL.revokeObjectURL(url);
+  };
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Zone Data</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-3 sm:grid-cols-5">
-            <div className="sm:col-span-2">
-              <label className="block text-sm mb-1">From</label>
-              <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="block text-sm mb-1">To</label>
-              <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-            </div>
-            <div className="flex items-end gap-2">
-              <Button onClick={() => exportCsv()} className="w-full sm:w-auto">Export CSV</Button>
-            </div>
+    <RouteGuard requiredRole="zone_admin">
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Zone Data</h1>
+            <p className="text-muted-foreground">
+              Monitor environmental readings and sensor data from your zone
+            </p>
           </div>
-        </CardContent>
-      </Card>
+          <Button onClick={exportToCSV} className="flex items-center gap-2">
+            <Download className="w-4 h-4" />
+            Export CSV
+          </Button>
+        </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Environmental Readings</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="mb-3">
-            <Input
-              placeholder="Quick filter (e.g. 6.5, 30, 24)"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Timestamp</TableHead>
-                <TableHead>Soil Moisture (%)</TableHead>
-                <TableHead>pH</TableHead>
-                <TableHead>Temperature (°C)</TableHead>
-                <TableHead>Humidity (%)</TableHead>
-                <TableHead>Phosphorus (ppm)</TableHead>
-                <TableHead>Potassium (ppm)</TableHead>
-                <TableHead>Nitrogen (ppm)</TableHead>
-                <TableHead>Rainfall (mm)</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {pageItems.map((d) => (
-                <TableRow key={d.id}>
-                  <TableCell>{new Date(d.read_from_iot_at).toLocaleString()}</TableCell>
-                  <TableCell>{d.soil_moisture}</TableCell>
-                  <TableCell>{d.ph}</TableCell>
-                  <TableCell>{d.temperature}</TableCell>
-                  <TableCell>{d.humidity}</TableCell>
-                  <TableCell>{d.phosphorus}</TableCell>
-                  <TableCell>{d.potassium}</TableCell>
-                  <TableCell>{d.nitrogen}</TableCell>
-                  <TableCell>{d.rainfall}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-
-          <div className="flex items-center justify-between mt-4">
-            <div className="text-sm text-muted-foreground">Page {page} of {totalPages}</div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>Previous</Button>
-              <Button variant="outline" size="sm" disabled={page === totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>Next</Button>
+        {/* Filters */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Filters</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Start Date</label>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">End Date</label>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Search</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search data..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+          </CardContent>
+        </Card>
+
+        {/* Data Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Environmental Readings</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Showing {paginatedData.length} of {filteredData.length} records
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date & Time</TableHead>
+                    <TableHead>Soil Moisture (%)</TableHead>
+                    <TableHead>pH</TableHead>
+                    <TableHead>Temperature (°C)</TableHead>
+                    <TableHead>Rainfall (mm)</TableHead>
+                    <TableHead>Phosphorus (ppm)</TableHead>
+                    <TableHead>Potassium (ppm)</TableHead>
+                    <TableHead>Humidity (%)</TableHead>
+                    <TableHead>Nitrogen (ppm)</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedData.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell>
+                        {new Date(item.read_from_iot_at).toLocaleString()}
+                      </TableCell>
+                      <TableCell>{item.soil_moisture}%</TableCell>
+                      <TableCell>{item.ph}</TableCell>
+                      <TableCell>{item.temperature}°C</TableCell>
+                      <TableCell>{item.rainfall}mm</TableCell>
+                      <TableCell>{item.phosphorus}</TableCell>
+                      <TableCell>{item.potassium}</TableCell>
+                      <TableCell>{item.humidity}%</TableCell>
+                      <TableCell>{item.nitrogen}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-4">
+                <div className="text-sm text-muted-foreground">
+                  Page {pagination.page} of {totalPages}
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPagination({ ...pagination, page: pagination.page - 1 })}
+                    disabled={pagination.page === 1}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPagination({ ...pagination, page: pagination.page + 1 })}
+                    disabled={pagination.page === totalPages}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </RouteGuard>
   );
 }
 

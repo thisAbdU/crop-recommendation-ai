@@ -1,38 +1,44 @@
-"use client"
+"use client";
 
 import { useEffect, useState } from "react";
 import { loadAuth } from "@/lib/auth";
 import { Role } from "@/lib/types";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  BarChart3, 
-  MapPin, 
-  Users, 
-  Wifi, 
-  Building2, 
-  Crop, 
-  AlertTriangle, 
+  BarChart3,
+  MapPin,
+  Users,
+  Wifi,
+  Building2,
+  Crop,
+  AlertTriangle,
   Calendar,
   TrendingUp,
   FileText,
   DollarSign,
-  Target
+  Target,
 } from "lucide-react";
 import Link from "next/link";
 
 export default function DashboardPage() {
-  const [userRole, setUserRole] = useState<Role | null>(null);
+  const [userRole, setUserRole] = useState<Role | null>("central_admin");
   const [userName, setUserName] = useState<string>("");
 
-  useEffect(() => {
-    const auth = loadAuth();
-    if (auth) {
-      setUserRole(auth.user.role);
-      setUserName(auth.user.name);
-    }
-  }, []);
+  // useEffect(() => {
+  //   const auth = loadAuth();
+  //   if (auth) {
+  //     setUserRole(auth.user.role);
+  //     setUserName(auth.user.name);
+  //   }
+  // }, []);
 
   const getRoleDisplayName = (role: Role) => {
     switch (role) {
@@ -43,7 +49,7 @@ export default function DashboardPage() {
       case "investor":
         return "Investor";
       default:
-        return "User";
+        return "Zone Administrator";
     }
   };
 
@@ -64,8 +70,12 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Central Administration Dashboard</h1>
-          <p className="text-muted-foreground">Manage all zones, users, and system operations</p>
+          <h1 className="text-3xl font-bold">
+            Central Administration Dashboard
+          </h1>
+          <p className="text-muted-foreground">
+            Manage all zones, users, and system operations
+          </p>
         </div>
         <Badge className={getRoleColor("central_admin")}>
           {getRoleDisplayName("central_admin")}
@@ -77,53 +87,55 @@ export default function DashboardPage() {
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Zones</CardTitle>
             <MapPin className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
+          </CardHeader>
+          <CardContent>
             <div className="text-2xl font-bold">12</div>
             <p className="text-xs text-muted-foreground">+2 from last month</p>
-              </CardContent>
-            </Card>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Active Users</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
+          </CardHeader>
+          <CardContent>
             <div className="text-2xl font-bold">48</div>
             <p className="text-xs text-muted-foreground">+5 from last week</p>
-              </CardContent>
-            </Card>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">IoT Devices</CardTitle>
             <Wifi className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
+          </CardHeader>
+          <CardContent>
             <div className="text-2xl font-bold">156</div>
             <p className="text-xs text-muted-foreground">98% operational</p>
-              </CardContent>
-            </Card>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">System Health</CardTitle>
             <Target className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
+          </CardHeader>
+          <CardContent>
             <div className="text-2xl font-bold">94%</div>
-            <p className="text-xs text-muted-foreground">All systems operational</p>
-              </CardContent>
-            </Card>
-          </div>
+            <p className="text-xs text-muted-foreground">
+              All systems operational
+            </p>
+          </CardContent>
+        </Card>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
-              <CardHeader>
+          <CardHeader>
             <CardTitle>Quick Actions</CardTitle>
             <CardDescription>Common administrative tasks</CardDescription>
-              </CardHeader>
+          </CardHeader>
           <CardContent className="space-y-3">
             <Button asChild className="w-full justify-start">
               <Link href="/dashboard/zones">
@@ -143,11 +155,11 @@ export default function DashboardPage() {
                 IoT Device Management
               </Link>
             </Button>
-              </CardContent>
-            </Card>
+          </CardContent>
+        </Card>
 
         <Card>
-              <CardHeader>
+          <CardHeader>
             <CardTitle>Recent Activity</CardTitle>
             <CardDescription>Latest system events</CardDescription>
           </CardHeader>
@@ -162,42 +174,48 @@ export default function DashboardPage() {
             <div className="flex items-center space-x-3">
               <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
               <div className="flex-1">
-                <p className="text-sm font-medium">User registration: John Doe</p>
+                <p className="text-sm font-medium">
+                  User registration: John Doe
+                </p>
                 <p className="text-xs text-muted-foreground">4 hours ago</p>
               </div>
             </div>
             <div className="flex items-center space-x-3">
               <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
               <div className="flex-1">
-                <p className="text-sm font-medium">IoT device maintenance scheduled</p>
+                <p className="text-sm font-medium">
+                  IoT device maintenance scheduled
+                </p>
                 <p className="text-xs text-muted-foreground">6 hours ago</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 
   const renderZoneAdminDashboard = () => (
     <div className="space-y-6">
-              <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Zone Administration Dashboard</h1>
-          <p className="text-muted-foreground">Monitor and manage your assigned zone</p>
-                  </div>
+          <p className="text-muted-foreground">
+            Monitor and manage your assigned zone
+          </p>
+        </div>
         <Badge className={getRoleColor("zone_admin")}>
           {getRoleDisplayName("zone_admin")}
         </Badge>
-                </div>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Zone Health</CardTitle>
             <Building2 className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
+          </CardHeader>
+          <CardContent>
             <div className="text-2xl font-bold">87%</div>
             <p className="text-xs text-muted-foreground">Optimal conditions</p>
           </CardContent>
@@ -210,16 +228,18 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">3</div>
-            <p className="text-xs text-muted-foreground">Wheat, Corn, Soybeans</p>
-            </CardContent>
-          </Card>
+            <p className="text-xs text-muted-foreground">
+              Wheat, Corn, Soybeans
+            </p>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Alerts</CardTitle>
             <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
+          </CardHeader>
+          <CardContent>
             <div className="text-2xl font-bold">2</div>
             <p className="text-xs text-muted-foreground">Requires attention</p>
           </CardContent>
@@ -227,15 +247,19 @@ export default function DashboardPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Next Maintenance</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Next Maintenance
+            </CardTitle>
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">3d</div>
-            <p className="text-xs text-muted-foreground">Scheduled irrigation</p>
+            <p className="text-xs text-muted-foreground">
+              Scheduled irrigation
+            </p>
           </CardContent>
         </Card>
-                            </div>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
@@ -247,19 +271,19 @@ export default function DashboardPage() {
             <div className="flex justify-between items-center">
               <span className="text-sm">Soil Moisture</span>
               <span className="text-sm font-medium">65%</span>
-                          </div>
+            </div>
             <div className="flex justify-between items-center">
               <span className="text-sm">Temperature</span>
               <span className="text-sm font-medium">24°C</span>
-                            </div>
+            </div>
             <div className="flex justify-between items-center">
               <span className="text-sm">pH Level</span>
               <span className="text-sm font-medium">6.8</span>
-                          </div>
+            </div>
             <div className="flex justify-between items-center">
               <span className="text-sm">Humidity</span>
               <span className="text-sm font-medium">72%</span>
-                          </div>
+            </div>
           </CardContent>
         </Card>
 
@@ -280,16 +304,16 @@ export default function DashboardPage() {
                 <AlertTriangle className="mr-2 h-4 w-4" />
                 Check Alerts
               </Link>
-                            </Button>
+            </Button>
             <Button asChild variant="outline" className="w-full justify-start">
               <Link href="/dashboard/schedule">
                 <Calendar className="mr-2 h-4 w-4" />
                 Maintenance Schedule
               </Link>
-                            </Button>
-            </CardContent>
-          </Card>
-        </div>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 
@@ -298,22 +322,28 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Investment Dashboard</h1>
-          <p className="text-muted-foreground">Monitor your agricultural investments and returns</p>
-                </div>
+          <p className="text-muted-foreground">
+            Monitor your agricultural investments and returns
+          </p>
+        </div>
         <Badge className={getRoleColor("investor")}>
           {getRoleDisplayName("investor")}
         </Badge>
-              </div>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Investment</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Total Investment
+            </CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">$2.4M</div>
-            <p className="text-xs text-muted-foreground">+12% from last quarter</p>
+            <p className="text-xs text-muted-foreground">
+              +12% from last quarter
+            </p>
           </CardContent>
         </Card>
 
@@ -324,7 +354,9 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">18.5%</div>
-            <p className="text-xs text-muted-foreground">+2.3% from last month</p>
+            <p className="text-xs text-muted-foreground">
+              +2.3% from last month
+            </p>
           </CardContent>
         </Card>
 
@@ -341,15 +373,17 @@ export default function DashboardPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Monthly Revenue</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Monthly Revenue
+            </CardTitle>
             <FileText className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
+          </CardHeader>
+          <CardContent>
             <div className="text-2xl font-bold">$156K</div>
             <p className="text-xs text-muted-foreground">+8% from last month</p>
-            </CardContent>
-          </Card>
-        </div>
+          </CardContent>
+        </Card>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
@@ -361,7 +395,7 @@ export default function DashboardPage() {
             <div className="flex justify-between items-center">
               <span className="text-sm">Zone A - Wheat</span>
               <span className="text-sm font-medium text-green-600">+22%</span>
-              </div>
+            </div>
             <div className="flex justify-between items-center">
               <span className="text-sm">Zone B - Corn</span>
               <span className="text-sm font-medium text-green-600">+18%</span>
@@ -373,7 +407,7 @@ export default function DashboardPage() {
             <div className="flex justify-between items-center">
               <span className="text-sm">Zone D - Rice</span>
               <span className="text-sm font-medium text-orange-600">+8%</span>
-                        </div>
+            </div>
           </CardContent>
         </Card>
 
@@ -400,7 +434,7 @@ export default function DashboardPage() {
                 <FileText className="mr-2 h-4 w-4" />
                 Financial Reports
               </Link>
-                        </Button>
+            </Button>
           </CardContent>
         </Card>
       </div>
@@ -430,10 +464,11 @@ export default function DashboardPage() {
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
             <h1 className="text-2xl font-bold mb-2">Access Denied</h1>
-            <p className="text-muted-foreground">You don't have permission to access this dashboard.</p>
+            <p className="text-muted-foreground">
+              You don't have permission to access this dashboard.
+            </p>
           </div>
         </div>
       );
   }
 }
-
