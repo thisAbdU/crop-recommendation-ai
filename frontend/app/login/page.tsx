@@ -23,7 +23,7 @@ export default function LoginPage() {
 
     try {
       const success = await login(email, password);
-      if (true) {
+      if (success) {
         // Redirect to dashboard
         router.push("/dashboard");
       } else {

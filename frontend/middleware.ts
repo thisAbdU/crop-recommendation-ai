@@ -1,105 +1,85 @@
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 
-// Role-based route access mapping
+// Define role-based route access
 const roleAccess = {
-  investor: [
-    "/dashboard",
-    "/zone-opportunities",
-    "/dashboard/portfolio",
-    "/dashboard/performance",
-    "/dashboard/reports",
-    "/dashboard/analytics",
+  central_admin: [
+    '/dashboard',
+    '/dashboard/zones',
+    '/dashboard/recommendations',
+    '/dashboard/iot-devices',
+    '/dashboard/profile'
   ],
   zone_admin: [
-    "/dashboard",
-    "/zone-data",
-    "/farmers",
-    "/dashboard/my-zone",
-    "/dashboard/crop-recommendations",
-    "/dashboard/alerts",
-    "/dashboard/schedule",
-    "/dashboard/analytics",
+    '/dashboard',
+    '/dashboard/zone-data',
+    '/dashboard/farmers',
+    '/dashboard/crop-recommendations',
+    '/dashboard/profile'
   ],
-  central_admin: [
-    "/dashboard",
-    "/dashboard/zones",
-    "/dashboard/iot-devices",
-    "/dashboard/users",
-    "/dashboard/reports",
-    "/dashboard/analytics",
-    "/dashboard/recommendations",
-  ],
-} as const;
+  investor: [
+    '/dashboard',
+    '/dashboard/zone-opportunities',
+    '/dashboard/portfolio',
+    '/dashboard/profile'
+  ]
+};
 
-// Public routes that don't require authentication
-const publicRoutes = ["/login", "/", "/dashboard", "/unauthorized"];
-
-// Check if user has access to a specific route
-function hasRouteAccess(userRole: string, route: string): boolean {
-  const allowedRoutes = roleAccess[userRole as keyof typeof roleAccess] || [];
-  return allowedRoutes.some(
-    (allowedRoute) =>
-      route === allowedRoute || route.startsWith(allowedRoute + "/")
-  );
-}
-
-// Extract user role from JWT token (basic implementation)
-function extractUserRoleFromToken(token: string): string | null {
-  try {
-    // In production, properly verify JWT signature
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    return payload.role || null;
-  } catch {
-    return null;
-  }
-}
+// Routes that require authentication
+const protectedRoutes = [
+  '/dashboard',
+  '/dashboard/zones',
+  '/dashboard/recommendations',
+  '/dashboard/iot-devices',
+  '/dashboard/zone-data',
+  '/dashboard/farmers',
+  '/dashboard/crop-recommendations',
+  '/dashboard/zone-opportunities',
+  '/dashboard/portfolio',
+  '/dashboard/profile'
+];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  
+  // Check if the route requires authentication
+  const isProtectedRoute = protectedRoutes.some(route => 
+    pathname.startsWith(route)
+  );
 
-  // Allow public routes
-  if (publicRoutes.includes(pathname)) {
-    return NextResponse.next();
+  if (isProtectedRoute) {
+    // Get token from cookies or headers
+    const token = request.cookies.get('auth_token')?.value || 
+                  request.headers.get('authorization')?.replace('Bearer ', '');
+
+    if (!token) {
+      // Redirect to login if no token
+      return NextResponse.redirect(new URL('/login', request.url));
+    }
+
+    try {
+      // In a real app, you'd verify the JWT token here
+      // For now, we'll check if it's a valid token format
+      if (token.length < 10) {
+        return NextResponse.redirect(new URL('/login', request.url));
+      }
+
+      // Extract user role from token (in a real app, decode JWT)
+      // For now, we'll allow access and let the frontend handle role-based routing
+      
+    } catch (error) {
+      // Invalid token, redirect to login
+      return NextResponse.redirect(new URL('/login', request.url));
+    }
   }
 
-  // Check for authentication token
-  const token =
-    request.cookies.get("auth_token")?.value ||
-    request.headers.get("authorization")?.replace("Bearer ", "");
-
-  if (!token) {
-    // Redirect to login if no token
-    return NextResponse.redirect(new URL("/login", request.url));
-  }
-
-  // Extract user role from token
-  const userRole = extractUserRoleFromToken(token);
-
-  if (!userRole) {
-    // Invalid token, redirect to login
-    return NextResponse.redirect(new URL("/login", request.url));
-  }
-
-  // Check if user has access to the requested route
-  if (!hasRouteAccess(userRole, pathname)) {
-    // User doesn't have access, redirect to unauthorized page
-    return NextResponse.redirect(new URL("/unauthorized", request.url));
-  }
-
-  // User is authenticated and authorized, proceed
+  // Allow access to public routes
   return NextResponse.next();
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
-    "/((?!api|_next/static|_next/image|favicon.ico).*)",
+    '/dashboard/:path*',
+    '/api/:path*'
   ],
 };

@@ -381,3 +381,4 @@ DEBUG_PERMISSIONS=true
 ```
 
 This will provide detailed information about authentication and authorization decisions.
+

@@ -1,15 +1,8 @@
 "use client"
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, Role } from '@/lib/types';
-import { 
-  getCurrentUser, 
-  isAuthenticated, 
-  logout as logoutUser,
-  saveAuth,
-  loadAuth
-} from '@/lib/auth';
-import { loginWithJwtMock } from '@/lib/api';
+import { User, AuthState } from '@/services/authService';
+import { AuthService } from '@/services/authService';
 
 interface AuthContextType {
   user: User | null;
@@ -30,9 +23,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const initAuth = () => {
       try {
-        const auth = loadAuth();
-        if (auth && isAuthenticated()) {
-          setUser(auth.user);
+        if (AuthService.isAuthenticated()) {
+          const currentUser = AuthService.getCurrentUser();
+          if (currentUser) {
+            setUser(currentUser);
+          }
         }
       } catch (error) {
         console.error('Failed to initialize auth:', error);
@@ -47,11 +42,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
       setLoading(true);
-      const result = await loginWithJwtMock(email, password);
+      const result = await AuthService.login({ email, password });
       
       if (result) {
-        const { token, user } = result;
-        saveAuth({ token, user });
+        const { user, token } = result;
+        // Store user info in localStorage for easy access
+        localStorage.setItem('user_info', JSON.stringify(user));
         setUser(user);
         return true;
       }
@@ -65,13 +61,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const logout = () => {
-    logoutUser();
-    setUser(null);
+  const logout = async () => {
+    try {
+      await AuthService.logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      setUser(null);
+      localStorage.removeItem('user_info');
+    }
   };
 
   const refreshUser = () => {
-    const currentUser = getCurrentUser();
+    const currentUser = AuthService.getCurrentUser();
     setUser(currentUser);
   };
 
@@ -100,13 +102,13 @@ export function useAuth() {
 }
 
 // Hook for checking if user has specific role
-export function useRole(requiredRole: Role): boolean {
+export function useRole(requiredRole: string): boolean {
   const { user } = useAuth();
   return user?.role === requiredRole;
 }
 
 // Hook for checking if user has any of the specified roles
-export function useAnyRole(requiredRoles: Role[]): boolean {
+export function useAnyRole(requiredRoles: string[]): boolean {
   const { user } = useAuth();
   return user ? requiredRoles.includes(user.role) : false;
 }

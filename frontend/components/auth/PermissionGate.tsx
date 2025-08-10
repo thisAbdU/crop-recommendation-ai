@@ -2,20 +2,17 @@
 
 import { ReactNode } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Role } from '@/lib/types';
 
 interface PermissionGateProps {
   children: ReactNode;
-  permission?: string;
-  allowedRoles?: Role[];
-  requiredRole?: Role;
+  allowedRoles?: string[];
+  requiredRole?: string;
   fallback?: ReactNode;
   showFallback?: boolean;
 }
 
 export function PermissionGate({
   children,
-  permission,
   allowedRoles,
   requiredRole,
   fallback = null,
@@ -23,25 +20,12 @@ export function PermissionGate({
 }: PermissionGateProps) {
   const { user } = useAuth();
 
-  // Check permission if specified
-  if (permission) {
-    // For now, we'll implement basic permission checking
-    // In a real app, you'd have a more sophisticated permission system
-    const hasPermission = user?.role === "central_admin" || 
-                         (user?.role === "zone_admin" && permission.includes("zone")) ||
-                         (user?.role === "investor" && permission.includes("view"));
-    
-    if (!hasPermission) {
-      return showFallback ? <>{fallback}</> : null;
-    }
-  }
-
   // Check role requirements
   if (requiredRole && user?.role !== requiredRole) {
     return showFallback ? <>{fallback}</> : null;
   }
 
-  if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(user?.role as Role)) {
+  if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(user?.role || '')) {
     return showFallback ? <>{fallback}</> : null;
   }
 

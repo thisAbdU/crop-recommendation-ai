@@ -1,119 +1,108 @@
 import { useAuth } from '@/contexts/AuthContext';
-import { useEffect, useState } from 'react';
 
-// Permission mappings
+// Permission mapping for different roles
 const PERMISSIONS = {
-  // Zone management permissions
-  "zones:read": ["central_admin"],
-  "zones:write": ["central_admin"],
-  "zones:delete": ["central_admin"],
+  // Zone management
+  MANAGE_ZONES: ['central_admin'],
+  VIEW_ZONES: ['central_admin', 'zone_admin', 'investor'],
   
-  // IoT device permissions
-  "iot:read": ["central_admin"],
-  "iot:write": ["central_admin"],
-  "iot:delete": ["central_admin"],
+  // Recommendations
+  MANAGE_RECOMMENDATIONS: ['central_admin', 'zone_admin'],
+  VIEW_RECOMMENDATIONS: ['central_admin', 'zone_admin', 'investor'],
   
-  // Farmer management permissions
-  "farmers:read": ["zone_admin", "central_admin"],
-  "farmers:write": ["zone_admin", "central_admin"],
-  "farmers:delete": ["zone_admin", "central_admin"],
+  // IoT Devices
+  MANAGE_DEVICES: ['central_admin'],
+  VIEW_DEVICES: ['central_admin', 'zone_admin'],
   
-  // Recommendation permissions
-  "recommendations:read": ["zone_admin", "central_admin", "investor"],
-  "recommendations:write": ["zone_admin", "central_admin"],
-  "recommendations:approve": ["zone_admin", "central_admin"],
+  // Farmers
+  MANAGE_FARMERS: ['central_admin', 'zone_admin'],
+  VIEW_FARMERS: ['central_admin', 'zone_admin'],
   
-  // Zone data permissions
-  "zone_data:read": ["zone_admin", "central_admin"],
-  "zone_data:write": ["zone_admin", "central_admin"],
+  // Sensor Data
+  VIEW_SENSOR_DATA: ['central_admin', 'zone_admin'],
   
-  // User management permissions
-  "users:read": ["central_admin"],
-  "users:write": ["central_admin"],
-  "users:delete": ["central_admin"]
-} as const;
-
-export type Permission = keyof typeof PERMISSIONS;
+  // Zone-specific data access
+  ZONE_DATA_ACCESS: ['zone_admin', 'central_admin'],
+  
+  // Investment/Portfolio
+  VIEW_OPPORTUNITIES: ['investor'],
+  MANAGE_PORTFOLIO: ['investor'],
+};
 
 export function usePermissions() {
-  const { user, loading } = useAuth();
-  const [permissions, setPermissions] = useState<Set<Permission>>(new Set());
+  const { user } = useAuth();
 
-  useEffect(() => {
-    if (user) {
-      const userPermissions = new Set<Permission>();
-      
-      // Add permissions based on user role
-      Object.entries(PERMISSIONS).forEach(([permission, allowedRoles]) => {
-        if (allowedRoles.includes(user.role)) {
-          userPermissions.add(permission as Permission);
-        }
-      });
-      
-      setPermissions(userPermissions);
-    } else {
-      setPermissions(new Set());
-    }
-  }, [user]);
-
-  const hasPermission = (permission: Permission): boolean => {
-    return permissions.has(permission);
-  };
-
-  const hasAnyPermission = (permissionList: Permission[]): boolean => {
-    return permissionList.some(permission => permissions.has(permission));
-  };
-
-  const hasAllPermissions = (permissionList: Permission[]): boolean => {
-    return permissionList.every(permission => permissions.has(permission));
-  };
-
-  const canAccessResource = (resourceType: string, action: string, resourceZoneId?: string): boolean => {
+  const hasPermission = (permission: keyof typeof PERMISSIONS): boolean => {
     if (!user) return false;
-
-    // Zone-specific access control
-    if (resourceZoneId && user.role === "zone_admin" && user.zoneId !== resourceZoneId) {
-      return false;
-    }
-
-    // Permission-based access control
-    const permission = `${resourceType}:${action}` as Permission;
-    return hasPermission(permission);
+    return PERMISSIONS[permission]?.includes(user.role) || false;
   };
+
+  const hasAnyPermission = (permissions: (keyof typeof PERMISSIONS)[]): boolean => {
+    return permissions.some(permission => hasPermission(permission));
+  };
+
+  const hasAllPermissions = (permissions: (keyof typeof PERMISSIONS)[]): boolean => {
+    return permissions.every(permission => hasPermission(permission));
+  };
+
+  const canAccessResource = (resourceType: string, resourceZoneId?: string): boolean => {
+    if (!user) return false;
+    
+    // Central admin can access all resources
+    if (user.role === 'central_admin') return true;
+    
+    // Zone admin can only access resources in their zone
+    if (user.role === 'zone_admin' && user.zone_id) {
+      return resourceZoneId === user.zone_id;
+    }
+    
+    // Investor has limited access
+    if (user.role === 'investor') {
+      return ['VIEW_OPPORTUNITIES', 'VIEW_RECOMMENDATIONS'].includes(resourceType);
+    }
+    
+    return false;
+  };
+
+  // Role-specific boolean flags
+  const isCentralAdmin = user?.role === 'central_admin';
+  const isZoneAdmin = user?.role === 'zone_admin';
+  const isInvestor = user?.role === 'investor';
+  const isAdmin = isCentralAdmin || isZoneAdmin;
 
   return {
-    user,
-    loading,
-    permissions,
     hasPermission,
     hasAnyPermission,
     hasAllPermissions,
     canAccessResource,
-    isZoneAdmin: user?.role === "zone_admin",
-    isCentralAdmin: user?.role === "central_admin",
-    isInvestor: user?.role === "investor",
+    isCentralAdmin,
+    isZoneAdmin,
+    isInvestor,
+    isAdmin,
+    user,
   };
 }
 
 // Hook for conditional rendering based on permissions
 export function useConditionalRender() {
-  const { hasPermission, hasAnyPermission, hasAllPermissions } = usePermissions();
+  const permissions = usePermissions();
 
-  const renderIf = (permission: Permission, component: React.ReactNode) => {
-    return hasPermission(permission) ? component : null;
+  const renderIf = (permission: keyof typeof PERMISSIONS, content: React.ReactNode) => {
+    return permissions.hasPermission(permission) ? content : null;
   };
 
-  const renderIfAny = (permissions: Permission[], component: React.ReactNode) => {
-    return hasAnyPermission(permissions) ? component : null;
+  const renderIfRole = (role: string, content: React.ReactNode) => {
+    return permissions.user?.role === role ? content : null;
   };
 
-  const renderIfAll = (permissions: Permission[], component: React.ReactNode) => {
-    return hasAllPermissions(permissions) ? component : null;
+  const renderIfAnyRole = (roles: string[], content: React.ReactNode) => {
+    return roles.includes(permissions.user?.role || '') ? content : null;
   };
 
   return {
     renderIf,
-    renderIfAny,
-    renderIfAll,
+    renderIfRole,
+    renderIfAnyRole,
   };
 }
+
