@@ -2,6 +2,7 @@ import enum
 from datetime import datetime
 from app import db
 from sqlalchemy.dialects.postgresql import JSONB
+from werkzeug.security import check_password_hash
 
 class UserRole(enum.Enum):
     FARMER = 'farmer'
@@ -48,6 +49,21 @@ class User(db.Model):
     approved_recommendations = db.relationship('Recommendation', backref='approved_by_user', foreign_keys='Recommendation.approved_by')
     prompt_templates = db.relationship('PromptTemplate', backref='owner')
     audit_logs = db.relationship('AuditLog', backref='user')
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "first_name": self.first_name,
+            "last_name": self.last_name,
+            "role": self.role.value if self.role else None,
+            "email": self.email,
+            "phone_number": self.phone_number,
+            "language": self.language
+        }
+    def check_password(self, password):
+        """Verify a password against the stored hash."""
+        return check_password_hash(self.password_hash, password)
+
 
 class Zone(db.Model):
     __tablename__ = 'zones'

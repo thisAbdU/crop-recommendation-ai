@@ -6,6 +6,7 @@ from app.models import User, UserRole
 from app.schemas import LoginSchema, LoginResponseSchema, UserSchema
 from marshmallow import ValidationError
 from app.utils import audit_log
+from werkzeug.security import generate_password_hash
 
 # Create Flask-Smorest blueprint
 blp = SmorestBlueprint('auth', __name__, description='Authentication endpoints')
@@ -74,18 +75,21 @@ def register(args):
         role=args['role'],
         email=args.get('email'),
         phone_number=args.get('phone_number'),
-        zone_id=args.get('zone_id'),
         language=args.get('language')
     )
     
+ 
+
     if args.get('password'):
-        user.set_password(args['password'])
+        hashed_password = generate_password_hash(args['password'], method='pbkdf2:sha256')
+        user.password_hash = hashed_password
+
     
     db.session.add(user)
     db.session.commit()
     
     # Log the registration
-    audit_log(current_user_id, 'user_created', 'user', user.id, {'created_user_role': user.role.value})
+    # audit_log(current_user_id, 'user_created', 'user', user.id, {'created_user_role': user.role.value})
     
     return user.to_dict(), 201
 
