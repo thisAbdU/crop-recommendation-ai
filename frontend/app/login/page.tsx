@@ -57,7 +57,7 @@ export default function LoginPage() {
             case "central_admin":
               router.push("/dashboard/zones");
               break;
-            case "investor":
+            case "EXPORTER":
               router.push("/dashboard");
               break;
             default:
@@ -103,7 +103,7 @@ export default function LoginPage() {
         email: signupData.email,
         password: signupData.password,
         phone_number: signupData.phone_number,
-        role: "INVESTER",
+        role: "EXPORTER",
       });
 
       if (response) {
@@ -135,7 +135,7 @@ export default function LoginPage() {
   }
 
   const handleDemoLogin = async (
-    role: "investor" | "zone_admin" | "central_admin"
+    role: "EXPORTER" | "zone_admin" | "central_admin"
   ) => {
     console.log("🔗 Demo login clicked for role:", role);
     setError(null);
@@ -171,7 +171,7 @@ export default function LoginPage() {
           case "central_admin":
             router.replace("/dashboard/zones");
             break;
-          case "investor":
+          case "EXPORTER":
             router.replace("/dashboard");
             break;
           default:
@@ -237,7 +237,7 @@ export default function LoginPage() {
                     disabled={isLoading}
                   />
                   <Input
-                    value="INVESTER"
+                    value="EXPORTER"
                     hidden
                     name="role"
                     required
@@ -302,7 +302,7 @@ export default function LoginPage() {
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => handleDemoLogin("investor")}
+                    onClick={() => handleDemoLogin("EXPORTER")}
                     disabled={isLoading}
                     className="text-xs"
                   >

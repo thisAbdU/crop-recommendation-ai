@@ -23,21 +23,23 @@ export interface SignupCredentials {
 
 export interface LoginResponse {
   user: {
-    name: string;
-    zone_id?: string;
+    id: number;
+    first_name: string;
+    last_name?: string;
+    phone_number: string;
+    zone_id?: number;
     role: string;
   };
-  token: string;
+  access_token: string;
 }
 
 export interface SignupResponse {
-  user: {
-    name: string;
-    email: string;
-    company: string;
-    role: string;
-  };
-  message: string;
+  first_name: string;
+  last_name: string;
+  role: string;
+  email: string;
+  password: string;
+  phone_number: string;
 }
 
 // Base API client
@@ -56,13 +58,12 @@ class ApiClient {
 
     const config: RequestInit = {
       headers: {
-
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
+        "Content-Type": "application/json",
+        Accept: "application/json",
         ...options.headers,
       },
-      mode: 'cors', // Enable CORS
-      credentials: 'omit', // Don't send cookies for cross-origin requests
+      mode: "cors", // Enable CORS
+      credentials: "omit", // Don't send cookies for cross-origin requests
       ...options,
     };
 
@@ -143,14 +144,18 @@ class ApiClient {
   }
 
   // Crop recommendation endpoint
-  async generateCropRecommendation(zoneId: number, startDate?: string, endDate?: string): Promise<ApiResponse<any>> {
+  async generateCropRecommendation(
+    zoneId: number,
+    startDate?: string,
+    endDate?: string
+  ): Promise<ApiResponse<any>> {
     const payload: any = { zone_id: zoneId || 1 };
-    
+
     if (startDate) payload.start_date = startDate;
     if (endDate) payload.end_date = endDate;
-    
-    return this.request<any>('/api/recommendations/generate', {
-      method: 'POST',
+
+    return this.request<any>("/api/recommendations/generate", {
+      method: "POST",
       body: JSON.stringify(payload),
     });
   }
