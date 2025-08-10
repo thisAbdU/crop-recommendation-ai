@@ -53,13 +53,11 @@ def login(args):
 @blp.arguments(UserSchema, location='json')
 @blp.response(201, UserSchema, description="User created successfully")
 @blp.response(400, description="Validation error")
-@blp.response(403, description="Unauthorized - central_admin required")
 @blp.response(409, description="User already exists")
 @blp.doc(
     summary="Register New User",
     description="Register a new user. Only central_admin users can create new users."
 )
-@jwt_required()
 def register(args):
     """Register new user - central_admin only for zone_admin registration"""
     
