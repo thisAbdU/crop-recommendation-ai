@@ -1,5 +1,5 @@
 // API service configuration and base functions
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 export interface ApiResponse<T> {
   data?: T;
@@ -13,12 +13,12 @@ export interface LoginCredentials {
 }
 
 export interface SignupCredentials {
-  firstName: string;
-  lastName: string;
+  first_name: string;
+  last_name: string;
   email: string;
   password: string;
-  company: string;
-  phone?: string;
+  role: string;
+  phone_number?: string;
 }
 
 export interface LoginResponse {
@@ -53,21 +53,21 @@ class ApiClient {
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
     const url = `${this.baseURL}${endpoint}`;
-    
+
     const config: RequestInit = {
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         ...options.headers,
       },
       ...options,
     };
 
     // Add auth token if available
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem("auth_token");
     if (token) {
       config.headers = {
         ...config.headers,
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       };
     }
 
@@ -84,53 +84,58 @@ class ApiClient {
       return { data };
     } catch (error) {
       return {
-        error: error instanceof Error ? error.message : 'Network error occurred',
+        error:
+          error instanceof Error ? error.message : "Network error occurred",
       };
     }
   }
 
   // Auth endpoints
-  async login(credentials: LoginCredentials): Promise<ApiResponse<LoginResponse>> {
-    return this.request<LoginResponse>('/api/auth/login/', {
-      method: 'POST',
+  async login(
+    credentials: LoginCredentials
+  ): Promise<ApiResponse<LoginResponse>> {
+    return this.request<LoginResponse>("/api/auth/login", {
+      method: "POST",
       body: JSON.stringify(credentials),
     });
   }
 
-  async signup(credentials: SignupCredentials): Promise<ApiResponse<SignupResponse>> {
-    return this.request<SignupResponse>('/api/auth/signup/', {
-      method: 'POST',
+  async signup(
+    credentials: SignupCredentials
+  ): Promise<ApiResponse<SignupResponse>> {
+    return this.request<SignupResponse>("/api/auth/register", {
+      method: "POST",
       body: JSON.stringify(credentials),
     });
   }
 
   async logout(): Promise<ApiResponse<void>> {
-    return this.request<void>('/api/auth/logout/', {
-      method: 'POST',
+    return this.request<void>("/api/auth/logout/", {
+      method: "POST",
     });
   }
 
   // Generic CRUD operations
   async get<T>(endpoint: string): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, { method: 'GET' });
+    return this.request<T>(endpoint, { method: "GET" });
   }
 
   async post<T>(endpoint: string, data: any): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify(data),
     });
   }
 
   async put<T>(endpoint: string, data: any): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
-      method: 'PUT',
+      method: "PUT",
       body: JSON.stringify(data),
     });
   }
 
   async delete<T>(endpoint: string): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, { method: 'DELETE' });
+    return this.request<T>(endpoint, { method: "DELETE" });
   }
 }
 
