@@ -3,16 +3,37 @@ import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, UserPlus, LogIn } from "lucide-react";
+import { AuthService } from "@/services/authService";
 
 export default function LoginPage() {
+  const [activeTab, setActiveTab] = useState("login");
+  
+  // Login state
   const [email, setEmail] = useState("ivy@example.com");
   const [password, setPassword] = useState("password");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Signup state
+  const [signupData, setSignupData] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+    company: "",
+    phone: ""
+  });
+  const [showSignupPassword, setShowSignupPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [signupError, setSignupError] = useState<string | null>(null);
+  const [isSignupLoading, setIsSignupLoading] = useState(false);
+  
   const router = useRouter();
   const { login } = useAuth();
 
@@ -34,6 +55,58 @@ export default function LoginPage() {
       console.error("Login error:", err);
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function handleSignup(e: React.FormEvent) {
+    e.preventDefault();
+    setSignupError(null);
+    
+    // Basic validation
+    if (signupData.password !== signupData.confirmPassword) {
+      setSignupError("Passwords do not match.");
+      return;
+    }
+    
+    if (signupData.password.length < 6) {
+      setSignupError("Password must be at least 6 characters long.");
+      return;
+    }
+    
+    setIsSignupLoading(true);
+    
+    try {
+      // Call the real signup API
+      const response = await AuthService.signup({
+        firstName: signupData.firstName,
+        lastName: signupData.lastName,
+        email: signupData.email,
+        password: signupData.password,
+        company: signupData.company,
+        phone: signupData.phone
+      });
+      
+      if (response) {
+        // Redirect to login tab with success message
+        setActiveTab("login");
+        setError("Account created successfully! Please sign in.");
+        
+        // Clear signup form
+        setSignupData({
+          firstName: "",
+          lastName: "",
+          email: "",
+          password: "",
+          confirmPassword: "",
+          company: "",
+          phone: ""
+        });
+      }
+    } catch (err) {
+      setSignupError(err instanceof Error ? err.message : "An error occurred during signup. Please try again.");
+      console.error("Signup error:", err);
+    } finally {
+      setIsSignupLoading(false);
     }
   }
 
@@ -90,107 +163,240 @@ export default function LoginPage() {
           </div>
           <CardTitle className="text-2xl">Welcome to CropAI</CardTitle>
           <p className="text-muted-foreground text-sm">
-            Sign in to access your dashboard
+            Sign in to access your dashboard or create an investor account
           </p>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <Input
-                placeholder="Email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                disabled={isLoading}
-              />
-            </div>
-            <div className="relative">
-              <Input
-                placeholder="Password"
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                disabled={isLoading}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                disabled={isLoading}
-              >
-                {showPassword ? (
-                  <EyeOff className="w-4 h-4" />
-                ) : (
-                  <Eye className="w-4 h-4" />
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="login" className="flex items-center space-x-2">
+                <LogIn className="w-4 h-4" />
+                <span>Sign In</span>
+              </TabsTrigger>
+              <TabsTrigger value="signup" className="flex items-center space-x-2">
+                <UserPlus className="w-4 h-4" />
+                <span>Sign Up</span>
+              </TabsTrigger>
+            </TabsList>
+            
+            {/* Login Tab */}
+            <TabsContent value="login" className="space-y-4 mt-6">
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <Input
+                    placeholder="Email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+                <div className="relative">
+                  <Input
+                    placeholder="Password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    disabled={isLoading}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    disabled={isLoading}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+
+                {error && (
+                  <div className="p-3 rounded-md bg-red-50 border border-red-200">
+                    <p className="text-sm text-red-600">{error}</p>
+                  </div>
                 )}
-              </button>
-            </div>
 
-            {error && (
-              <div className="p-3 rounded-md bg-red-50 border border-red-200">
-                <p className="text-sm text-red-600">{error}</p>
+                <Button className="w-full" type="submit" disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Signing in...
+                    </>
+                  ) : (
+                    "Sign in"
+                  )}
+                </Button>
+              </form>
+
+              <div className="mt-6">
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-background px-2 text-muted-foreground">
+                      Or try demo accounts
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-3 gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDemoLogin("investor")}
+                    disabled={isLoading}
+                    className="text-xs"
+                  >
+                    Investor
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDemoLogin("zone_admin")}
+                    disabled={isLoading}
+                    className="text-xs"
+                  >
+                    Zone Admin
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDemoLogin("central_admin")}
+                    disabled={isLoading}
+                    className="text-xs"
+                  >
+                    Central Admin
+                  </Button>
+                </div>
               </div>
-            )}
-
-            <Button className="w-full" type="submit" disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Signing in...
-                </>
-              ) : (
-                "Sign in"
-              )}
-            </Button>
-          </form>
-
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
+            </TabsContent>
+            
+            {/* Signup Tab */}
+            <TabsContent value="signup" className="space-y-4 mt-6">
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                <p className="text-sm text-blue-700 text-center">
+                  <strong>Investor Signup Only</strong><br />
+                  Create your account to access agricultural investment insights
+                </p>
               </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">
-                  Or try demo accounts
-                </span>
-              </div>
-            </div>
+              
+              <form onSubmit={handleSignup} className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <Input
+                    placeholder="First Name"
+                    value={signupData.firstName}
+                    onChange={(e) => setSignupData({...signupData, firstName: e.target.value})}
+                    required
+                    disabled={isSignupLoading}
+                  />
+                  <Input
+                    placeholder="Last Name"
+                    value={signupData.lastName}
+                    onChange={(e) => setSignupData({...signupData, lastName: e.target.value})}
+                    required
+                    disabled={isSignupLoading}
+                  />
+                </div>
+                
+                <Input
+                  placeholder="Email"
+                  type="email"
+                  value={signupData.email}
+                  onChange={(e) => setSignupData({...signupData, email: e.target.value})}
+                  required
+                  disabled={isSignupLoading}
+                />
+                
+                <Input
+                  placeholder="Company Name"
+                  value={signupData.company}
+                  onChange={(e) => setSignupData({...signupData, company: e.target.value})}
+                  required
+                  disabled={isSignupLoading}
+                />
+                
+                <Input
+                  placeholder="Phone Number"
+                  type="tel"
+                  value={signupData.phone}
+                  onChange={(e) => setSignupData({...signupData, phone: e.target.value})}
+                  disabled={isSignupLoading}
+                />
+                
+                <div className="relative">
+                  <Input
+                    placeholder="Password"
+                    type={showSignupPassword ? "text" : "password"}
+                    value={signupData.password}
+                    onChange={(e) => setSignupData({...signupData, password: e.target.value})}
+                    required
+                    disabled={isSignupLoading}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowSignupPassword(!showSignupPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    disabled={isSignupLoading}
+                  >
+                    {showSignupPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+                
+                <div className="relative">
+                  <Input
+                    placeholder="Confirm Password"
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={signupData.confirmPassword}
+                    onChange={(e) => setSignupData({...signupData, confirmPassword: e.target.value})}
+                    required
+                    disabled={isSignupLoading}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    disabled={isSignupLoading}
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
 
-            <div className="mt-4 grid grid-cols-3 gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => handleDemoLogin("investor")}
-                disabled={isLoading}
-                className="text-xs"
-              >
-                Investor
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => handleDemoLogin("zone_admin")}
-                disabled={isLoading}
-                className="text-xs"
-              >
-                Zone Admin
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => handleDemoLogin("central_admin")}
-                disabled={isLoading}
-                className="text-xs"
-              >
-                Central Admin
-              </Button>
-            </div>
-          </div>
+                {signupError && (
+                  <div className="p-3 rounded-md bg-red-50 border border-red-200">
+                    <p className="text-sm text-red-600">{signupError}</p>
+                  </div>
+                )}
+
+                <Button className="w-full" type="submit" disabled={isSignupLoading}>
+                  {isSignupLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Creating Account...
+                    </>
+                  ) : (
+                    "Create Investor Account"
+                  )}
+                </Button>
+              </form>
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
     </div>

@@ -1,12 +1,12 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { loadAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { User, Mail, Building, Shield } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface UserProfile {
   name: string;
@@ -23,7 +23,7 @@ export default function ProfilePage() {
   const [formData, setFormData] = useState<UserProfile | null>(null);
 
   useEffect(() => {
-    const auth = loadAuth();
+    const auth = useAuth;
     if (!auth) {
       router.replace("/login");
       return;
