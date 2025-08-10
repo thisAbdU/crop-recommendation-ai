@@ -1,5 +1,5 @@
 // API service configuration and base functions
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 export interface ApiResponse<T> {
   data?: T;
@@ -57,8 +57,11 @@ class ApiClient {
     const config: RequestInit = {
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
         ...options.headers,
       },
+      mode: 'cors', // Enable CORS
+      credentials: 'omit', // Don't send cookies for cross-origin requests
       ...options,
     };
 
@@ -131,6 +134,19 @@ class ApiClient {
 
   async delete<T>(endpoint: string): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, { method: 'DELETE' });
+  }
+
+  // Crop recommendation endpoint
+  async generateCropRecommendation(zoneId: number, startDate?: string, endDate?: string): Promise<ApiResponse<any>> {
+    const payload: any = { zone_id: zoneId || 1 };
+    
+    if (startDate) payload.start_date = startDate;
+    if (endDate) payload.end_date = endDate;
+    
+    return this.request<any>('/api/recommendations/generate', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
   }
 }
 

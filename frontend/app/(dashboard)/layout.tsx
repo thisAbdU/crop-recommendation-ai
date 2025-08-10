@@ -227,7 +227,18 @@ export default function DashboardLayout({
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild>
                         <Link
-                          href="/dashboard/zone-data"
+                          href="/dashboard/zone-admin-dashboard"
+                          className="flex items-center gap-3"
+                        >
+                          <Leaf className="w-4 h-4" />
+                          <span>AI Zone Dashboard</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild>
+                        <Link
+                          href="/zone-data"
                           className="flex items-center gap-3"
                         >
                           <BarChart3 className="w-4 h-4" />
