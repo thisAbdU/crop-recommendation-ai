@@ -3,6 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager
 from flask_smorest import Api
+from flask_cors import CORS
 import os
 from datetime import timedelta
 import logging
@@ -19,6 +20,16 @@ jwt = JWTManager()
 def create_app(config_name=None):
     """Application factory pattern"""
     app = Flask(__name__)
+    
+    # Enable CORS for all routes
+    CORS(app, resources={
+        r"/api/*": {
+            "origins": ["http://localhost:3000", "http://127.0.0.1:3000"],
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization", "Accept"],
+            "supports_credentials": False
+        }
+    })
     
     # Load configuration
     if config_name is None:

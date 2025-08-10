@@ -110,4 +110,61 @@ export interface Recommendation {
   rationale: string;
   createdAt: string;
   updatedAt: string;
+}
+
+// AI Recommendation API Response interfaces
+export interface AIRecommendationCrop {
+  crop_name: string;
+  key_environmental_factors: {
+    moisture_optimal: string;
+    ph_optimal: string;
+    temperature_optimal: string;
+  };
+  probability: number;
+  rank: number;
+  rationale_text: string;
+  soil_type: string;
+  suitability_score: number;
+}
+
+export interface AIRecommendationDataQuality {
+  grade: string;
+  issues: string[];
+  recommendation: string;
+  score: number;
+}
+
+export interface AIRecommendationResult {
+  confidence: number;
+  crops: AIRecommendationCrop[];
+  data_quality: AIRecommendationDataQuality;
+  generated_at: string;
+  response: string;
+  soil_type: string;
+}
+
+export interface AIRecommendationResponse {
+  success: boolean;
+  message: string;
+  data: {
+    ai_result: AIRecommendationResult;
+    confidence: number;
+    data_quality: AIRecommendationDataQuality;
+    generated_at: string;
+    recommendation_id: number;
+    zone_id: number;
+    zone_name: string;
+  };
+}
+
+// Chat message interface for AI chatbot
+export interface ChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  timestamp: Date;
+  metadata?: {
+    crop_recommendation?: AIRecommendationCrop;
+    sensor_data?: Partial<SensorDataPoint>;
+  };
 } 

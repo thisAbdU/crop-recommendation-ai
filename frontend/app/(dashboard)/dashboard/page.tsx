@@ -14,6 +14,7 @@ import {
   Target,
   BarChart3,
   Wifi,
+  Leaf,
 } from "lucide-react";
 
 export default function DashboardPage() {
@@ -273,6 +274,15 @@ export default function DashboardPage() {
                 <Button variant="outline" size="sm">
                   <Users className="w-4 h-4 mr-2" />
                   Manage Farmers
+                </Button>
+                <Button 
+                  variant="default" 
+                  size="sm" 
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                  onClick={() => window.location.href = "/dashboard/zone-admin-dashboard"}
+                >
+                  <Leaf className="w-4 h-4 mr-2" />
+                  AI Zone Dashboard
                 </Button>
               </>
             )}
