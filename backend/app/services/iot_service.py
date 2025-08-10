@@ -47,15 +47,15 @@ class IoTService:
             
             sensor_data = ZoneLandCondition.query.filter(
                 and_(
-                    ZoneLandCondition.device_id == device_id,
-                    ZoneLandCondition.timestamp >= start_date,
-                    ZoneLandCondition.timestamp <= end_date
+                    ZoneLandCondition.device_tag == device_id,
+                    ZoneLandCondition.read_from_iot_at >= start_date,
+                    ZoneLandCondition.read_from_iot_at <= end_date
                 )
-            ).order_by(desc(ZoneLandCondition.timestamp)).limit(limit).all()
+            ).order_by(desc(ZoneLandCondition.read_from_iot_at)).limit(limit).all()
             
             return [{
                 'id': data.id,
-                'timestamp': data.timestamp.isoformat(),
+                'read_from_iot_at': data.read_from_iot_at.isoformat(),
                 'nitrogen': data.nitrogen,
                 'phosphorus': data.phosphorus,
                 'potassium': data.potassium,
@@ -78,7 +78,7 @@ class IoTService:
             # Get the most recent sensor data for each device in the zone
             latest_readings = db.session.query(
                 ZoneLandCondition.device_id,
-                func.max(ZoneLandCondition.timestamp).label('latest_timestamp')
+                func.max(ZoneLandCondition.read_from_iot_at).label('latest_timestamp')
             ).filter(ZoneLandCondition.zone_id == zone_id).group_by(ZoneLandCondition.device_id).all()
             
             if not latest_readings:
@@ -90,14 +90,14 @@ class IoTService:
                 data = ZoneLandCondition.query.filter(
                     and_(
                         ZoneLandCondition.device_id == device_id,
-                        ZoneLandCondition.timestamp == latest_timestamp
+                        ZoneLandCondition.read_from_iot_at == latest_timestamp
                     )
                 ).first()
                 
                 if data:
                     sensor_data.append({
                         'device_id': data.device_id,
-                        'timestamp': data.timestamp.isoformat(),
+                        'read_from_iot_at': data.read_from_iot_at.isoformat(),
                         'nitrogen': data.nitrogen,
                         'phosphorus': data.phosphorus,
                         'potassium': data.potassium,
@@ -112,7 +112,7 @@ class IoTService:
                 'zone_id': zone_id,
                 'latest_readings': sensor_data,
                 'total_devices': len(sensor_data),
-                'last_updated': max([data['timestamp'] for data in sensor_data]) if sensor_data else None
+                'last_updated': max([data['read_from_iot_at'] for data in sensor_data]) if sensor_data else None
             }
             
         except Exception as e:
@@ -134,7 +134,7 @@ class IoTService:
             sensor_record = ZoneLandCondition(
                 zone_id=zone_id,
                 device_id=device_id,
-                timestamp=datetime.utcnow(),
+                read_from_iot_at=datetime.utcnow(),
                 nitrogen=sensor_data.get('nitrogen', 50.0),
                 phosphorus=sensor_data.get('phosphorus', 50.0),
                 potassium=sensor_data.get('potassium', 50.0),
@@ -156,7 +156,7 @@ class IoTService:
                 'sensor_data_id': sensor_record.id,
                 'device_id': device_id,
                 'zone_id': zone_id,
-                'timestamp': sensor_record.timestamp.isoformat(),
+                'read_from_iot_at': sensor_record.read_from_iot_at.isoformat(),
                 'data_quality': self._assess_data_quality(sensor_data)
             }
             
@@ -175,8 +175,8 @@ class IoTService:
             sensor_data = ZoneLandCondition.query.filter(
                 and_(
                     ZoneLandCondition.zone_id == zone_id,
-                    ZoneLandCondition.timestamp >= start_date,
-                    ZoneLandCondition.timestamp <= end_date
+                    ZoneLandCondition.read_from_iot_at >= start_date,
+                    ZoneLandCondition.read_from_iot_at <= end_date
                 )
             ).all()
             

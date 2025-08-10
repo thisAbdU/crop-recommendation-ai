@@ -27,11 +27,13 @@ services:
       - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY}
       - PROMPTS_DIR=/app/prompts
       - ADMIN_EMAIL=admin@example.com
+      - AGRI_AI_MODEL_PATH=/app/ai_model  # Use absolute path
     ports:
       - "5000:5000"
     volumes:
       - ./prompts:/app/prompts
       - ./logs:/app/logs
+      - ./ai_model:/app/ai_model
     depends_on:
       postgres:
         condition: service_healthy

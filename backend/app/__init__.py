@@ -5,6 +5,11 @@ from flask_jwt_extended import JWTManager
 from flask_smorest import Api
 import os
 from datetime import timedelta
+import logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 
 # Initialize extensions
 db = SQLAlchemy()
@@ -90,8 +95,8 @@ def create_app(config_name=None):
         }, 200
     
     # Create tables
-    with app.app_context():
-        db.create_all()
+    # with app.app_context():
+    #     db.create_all()
     
     return app
 
