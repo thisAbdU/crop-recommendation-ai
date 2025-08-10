@@ -81,8 +81,8 @@ def register(args):
  
 
     if args.get('password'):
-        hashed_password = generate_password_hash(args['password'], method='pbkdf2:sha256')
-        user.password_hash = hashed_password
+        user.password_hash = args['password']  # Store as plain text for demo only
+
 
     
     db.session.add(user)

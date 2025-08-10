@@ -61,8 +61,9 @@ class User(db.Model):
             "language": self.language
         }
     def check_password(self, password):
-        """Verify a password against the stored hash."""
-        return check_password_hash(self.password_hash, password)
+        # Plain text comparison for demo only
+        return self.password_hash == password
+
 
 
 class Zone(db.Model):
