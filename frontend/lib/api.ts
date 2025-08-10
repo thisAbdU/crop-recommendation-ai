@@ -1,5 +1,124 @@
-import { mockRecommendations, mockSensorData, mockTechnicians, mockUsers, mockZones, mockFarmers, mockDevices } from "./mockData";
-import { Recommendation, Role, SensorDataPoint, Technician, User, Zone, Farmer } from "./types";
+import { Recommendation, Role, SensorDataPoint, Technician, User, Zone, Farmer, IoTDevice } from "./types";
+
+// Mock data for testing
+const mockSensorData: SensorDataPoint[] = [
+  {
+    id: 1,
+    read_from_iot_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
+    soil_moisture: 65,
+    ph: 6.8,
+    temperature: 24,
+    phosphorus: 45,
+    potassium: 180,
+    humidity: 72,
+    nitrogen: 35,
+    rainfall: 0,
+    zone_id: "zone_001"
+  },
+  {
+    id: 2,
+    read_from_iot_at: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(), // 4 hours ago
+    soil_moisture: 58,
+    ph: 6.5,
+    temperature: 26,
+    phosphorus: 42,
+    potassium: 175,
+    humidity: 68,
+    nitrogen: 32,
+    rainfall: 5,
+    zone_id: "zone_001"
+  },
+  {
+    id: 3,
+    read_from_iot_at: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(), // 6 hours ago
+    soil_moisture: 62,
+    ph: 6.9,
+    temperature: 23,
+    phosphorus: 48,
+    potassium: 185,
+    humidity: 75,
+    nitrogen: 38,
+    rainfall: 0,
+    zone_id: "zone_001"
+  },
+  {
+    id: 4,
+    read_from_iot_at: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(), // 8 hours ago
+    soil_moisture: 55,
+    ph: 6.3,
+    temperature: 27,
+    phosphorus: 40,
+    potassium: 170,
+    humidity: 65,
+    nitrogen: 30,
+    rainfall: 8,
+    zone_id: "zone_001"
+  },
+  {
+    id: 5,
+    read_from_iot_at: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(), // 12 hours ago
+    soil_moisture: 70,
+    ph: 7.1,
+    temperature: 22,
+    phosphorus: 50,
+    potassium: 190,
+    humidity: 78,
+    nitrogen: 40,
+    rainfall: 0,
+    zone_id: "zone_001"
+  }
+];
+
+// Mock other data
+const mockRecommendations: Recommendation[] = [
+  {
+    id: "1",
+    zoneId: "zone_001",
+    crop: "Corn",
+    variety: "Sweet Corn",
+    plantingDate: new Date().toISOString(),
+    harvestDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
+    status: "approved",
+    suitability_score: 85,
+    key_environmental_factors: {
+      ph: 6.8,
+      soil_type: "Loamy",
+      climate: "Temperate"
+    },
+    rationale: "Optimal conditions for corn growth",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  }
+];
+
+const mockTechnicians: Technician[] = [];
+const mockUsers: User[] = [];
+const mockZones: Zone[] = [];
+const mockFarmers: Farmer[] = [
+  {
+    id: 1,
+    name: "John Farmer",
+    email: "john@farm.com",
+    phone: "+1234567890",
+    zone_id: "zone_001",
+    status: "active",
+    crops: ["Corn", "Soybeans"],
+    area: 150,
+    lastVisit: new Date().toISOString()
+  }
+];
+const mockDevices: IoTDevice[] = [
+  {
+    id: 1,
+    name: "Soil Sensor 001",
+    zone_id: "zone_001",
+    type: "soil_sensor",
+    status: "online",
+    lastReading: new Date().toISOString(),
+    battery: 85,
+    location: "Field A"
+  }
+];
 
 // Backend API base URL
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
@@ -152,7 +271,7 @@ export async function getRecommendationById(id: string): Promise<Recommendation 
 }
 
 export async function getSensorDataByZone(zoneId: string, from?: string, to?: string): Promise<SensorDataPoint[]> {
-  let data = mockSensorData.filter((d) => d.zoneId === zoneId);
+  let data = mockSensorData.filter((d) => d.zone_id === zoneId);
   if (from) {
     const fromTime = new Date(from).getTime();
     data = data.filter((d) => new Date(d.read_from_iot_at).getTime() >= fromTime);
@@ -232,7 +351,7 @@ export async function getDashboardDataForRole(role: Role, user?: User) {
             .filter((r) => r.zoneId === zone.id)
             .sort((a, b) => b.suitability_score - a.suitability_score);
 
-          const data = mockSensorData.filter((d) => d.zoneId === zone.id);
+          const data = mockSensorData.filter((d) => d.zone_id === zone.id);
           const avg = (arr: number[]) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0);
           const avgPh = Number(avg(data.map((d) => d.ph)).toFixed(2));
           const avgMoisture = Number(avg(data.map((d) => d.soil_moisture)).toFixed(2));
@@ -258,8 +377,8 @@ export async function getDashboardDataForRole(role: Role, user?: User) {
 
   if (role === "zone_admin" && user?.zoneId) {
     const recs = mockRecommendations.filter((r) => r.zoneId === user.zoneId);
-    const farmersInZone = mockFarmers.filter((f) => f.zoneId === user.zoneId);
-    const activeDevices = mockDevices.filter((d) => d.zoneId === user.zoneId && d.status === "online");
+    const farmersInZone = mockFarmers.filter((f) => f.zone_id === user.zoneId);
+    const activeDevices = mockDevices.filter((d) => d.zone_id === user.zoneId && d.status === "online");
     return {
       stats: {
         totalFarmers: farmersInZone.length,
@@ -287,7 +406,7 @@ export async function getDashboardDataForRole(role: Role, user?: User) {
 }
 
 export async function getFarmersByZone(zoneId: string): Promise<Farmer[]> {
-  return mockFarmers.filter((f) => f.zoneId === zoneId);
+  return mockFarmers.filter((f) => f.zone_id === zoneId);
 }
 
 export async function createFarmer(farmer: Omit<Farmer, "id">): Promise<Farmer> {

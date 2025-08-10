@@ -33,18 +33,6 @@ class AIClient:
             model_file = os.path.join(self.model_path, 'model', 'crop_rec_model.pkl')
             scaler_file = os.path.join(self.model_path, 'model', 'scaler.pkl')
             
-            logger.info(f"=== AI Client Initialization ===")
-            logger.info(f"Config model path: {config_path}")
-            logger.info(f"Resolved model path: {self.model_path}")
-            logger.info(f"Looking for ML model files:")
-            logger.info(f"  Model file: {model_file}")
-            logger.info(f"  Scaler file: {scaler_file}")
-            logger.info(f"  Current working directory: {os.getcwd()}")
-            logger.info(f"  App root path: {current_app.root_path}")
-            logger.info(f"  Model path exists: {os.path.exists(self.model_path)}")
-            logger.info(f"  Model file exists: {os.path.exists(model_file)}")
-            logger.info(f"  Scaler file exists: {os.path.exists(scaler_file)}")
-            
             # List contents for debugging
             if os.path.exists(self.model_path):
                 logger.info(f"Contents of {self.model_path}: {os.listdir(self.model_path)}")

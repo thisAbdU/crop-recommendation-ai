@@ -28,10 +28,10 @@ export default function ZoneDataPage() {
   }, []);
 
   const loadSensorData = async () => {
-    if (!user?.zoneId) return;
+    if (!user?.zone_id) return;
     
     try {
-      const data = await getSensorDataByZone(user.zoneId, startDate || undefined, endDate || undefined);
+      const data = await getSensorDataByZone(user.zone_id, startDate || undefined, endDate || undefined);
       setSensorData(data);
     } catch (error) {
       console.error("Failed to load sensor data:", error);
@@ -39,7 +39,7 @@ export default function ZoneDataPage() {
   };
 
   useEffect(() => {
-    if (user?.zoneId) {
+    if (user?.zone_id) {
       loadSensorData();
     }
   }, [startDate, endDate, user]);
@@ -99,6 +99,16 @@ export default function ZoneDataPage() {
   return (
     <RouteGuard requiredRole="zone_admin">
       <div className="space-y-6">
+        {/* Help message for testing */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center gap-2 text-blue-800">
+            <span className="text-sm font-medium">🔑 Testing Access:</span>
+            <span className="text-sm">
+              Use the <strong>Zone Admin</strong> demo button on the login page, or call <code className="bg-blue-100 px-1 rounded">setupZoneAdmin()</code> in browser console
+            </span>
+          </div>
+        </div>
+        
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Zone Data</h1>

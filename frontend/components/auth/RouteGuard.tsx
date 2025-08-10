@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { isAuthenticated, getCurrentUserRole, hasRouteAccess } from "@/lib/auth";
+import { useAuth } from "@/contexts/AuthContext";
+import { hasRouteAccess } from "@/lib/auth";
 import { Role } from "@/lib/types";
 
 interface RouteGuardProps {
@@ -18,13 +19,19 @@ export function RouteGuard({
 }: RouteGuardProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const { isAuthenticated, user, loading: authLoading } = useAuth();
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // Wait for auth to finish loading
+    if (authLoading) {
+      return;
+    }
+
     const checkAuthorization = () => {
       // Check if user is authenticated
-      if (!isAuthenticated()) {
+      if (!isAuthenticated || !user) {
         setIsAuthorized(false);
         setIsLoading(false);
         router.replace("/login");
@@ -33,7 +40,7 @@ export function RouteGuard({
 
       // If no specific role is required, just check route access
       if (!requiredRole) {
-        const userRole = getCurrentUserRole();
+        const userRole = user.role;
         if (!userRole) {
           setIsAuthorized(false);
           setIsLoading(false);
@@ -56,7 +63,7 @@ export function RouteGuard({
       }
 
       // Check specific role requirement
-      const userRole = getCurrentUserRole();
+      const userRole = user.role;
       if (!userRole || userRole !== requiredRole) {
         setIsAuthorized(false);
         setIsLoading(false);
@@ -78,7 +85,7 @@ export function RouteGuard({
     };
 
     checkAuthorization();
-  }, [router, pathname, requiredRole]);
+  }, [router, pathname, requiredRole, isAuthenticated, user, authLoading]);
 
   // Show loading state
   if (isLoading) {

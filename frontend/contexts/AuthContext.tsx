@@ -9,6 +9,7 @@ interface AuthContextType {
   loading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<boolean>;
+  demoLogin: (role: "investor" | "zone_admin" | "central_admin") => Promise<boolean>;
   logout: () => void;
   refreshUser: () => void;
 }
@@ -61,6 +62,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const demoLogin = async (role: "investor" | "zone_admin" | "central_admin"): Promise<boolean> => {
+    try {
+      setLoading(true);
+      
+      // Create demo users without API calls
+      let demoUser: User;
+      
+      switch (role) {
+        case "investor":
+          demoUser = {
+            name: "Demo Investor",
+            role: "investor"
+          };
+          break;
+        case "zone_admin":
+          demoUser = {
+            name: "Demo Zone Admin",
+            zone_id: "zone_001",
+            role: "zone_admin"
+          };
+          break;
+        case "central_admin":
+          demoUser = {
+            name: "Demo Central Admin",
+            role: "central_admin"
+          };
+          break;
+        default:
+          return false;
+      }
+      
+      // Store demo user info and token
+      localStorage.setItem('user_info', JSON.stringify(demoUser));
+      localStorage.setItem('auth_token', `demo_token_${role}`);
+      
+      // ALSO SET A COOKIE for middleware to see
+      document.cookie = `auth_token=demo_token_${role}; path=/; max-age=86400; SameSite=Lax`;
+      
+      setUser(demoUser);
+      return true;
+    } catch (error) {
+      console.error('Demo login failed:', error);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const logout = async () => {
     try {
       await AuthService.logout();
@@ -69,6 +118,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setUser(null);
       localStorage.removeItem('user_info');
+      // ALSO CLEAR THE COOKIE
+      document.cookie = 'auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
     }
   };
 
@@ -82,6 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loading,
     isAuthenticated: !!user,
     login,
+    demoLogin,
     logout,
     refreshUser,
   };

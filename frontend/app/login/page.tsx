@@ -35,7 +35,7 @@ export default function LoginPage() {
   const [isSignupLoading, setIsSignupLoading] = useState(false);
   
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, demoLogin, user } = useAuth();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -45,8 +45,28 @@ export default function LoginPage() {
     try {
       const success = await login(email, password);
       if (success) {
-        // Redirect to dashboard
-        router.push("/dashboard");
+        // Get user info to determine role-based redirect
+        const userInfo = localStorage.getItem('user_info');
+        if (userInfo) {
+          const user = JSON.parse(userInfo);
+          // Redirect based on user role
+          switch (user.role) {
+            case "zone_admin":
+              router.push("/dashboard/zone-data");
+              break;
+            case "central_admin":
+              router.push("/dashboard/zones");
+              break;
+            case "investor":
+              router.push("/dashboard");
+              break;
+            default:
+              router.push("/dashboard");
+          }
+        } else {
+          // Fallback to default dashboard
+          router.push("/dashboard");
+        }
       } else {
         setError("Invalid credentials. Please check your email and password.");
       }
@@ -113,41 +133,48 @@ export default function LoginPage() {
   const handleDemoLogin = async (
     role: "investor" | "zone_admin" | "central_admin"
   ) => {
+    console.log("🔗 Demo login clicked for role:", role);
     setError(null);
     setIsLoading(true);
 
     try {
-      let demoEmail: string;
-      let demoPassword: string;
-
-      switch (role) {
-        case "investor":
-          demoEmail = "ivy@example.com";
-          demoPassword = "password123";
-          break;
-        case "zone_admin":
-          demoEmail = "zane@example.com";
-          demoPassword = "password123";
-          break;
-        case "central_admin":
-          demoEmail = "cora@example.com";
-          demoPassword = "password123";
-          break;
-        default:
-          demoEmail = "ivy@example.com";
-          demoPassword = "password";
-      }
-
-      setEmail(demoEmail);
-      setPassword(demoPassword);
-
-      const success = await login(demoEmail, demoPassword);
+      console.log("📞 Calling demoLogin function...");
+      // Use the new demoLogin function from AuthContext
+      const success = await demoLogin(role);
+      console.log("✅ demoLogin result:", success);
+      
       if (success) {
-        router.push("/dashboard");
+        console.log("🎉 Demo login successful, redirecting to role-specific dashboard...");
+        
+        // Debug: Check localStorage and user state
+        console.log("🔍 localStorage user_info:", localStorage.getItem('user_info'));
+        console.log("🔍 localStorage auth_token:", localStorage.getItem('auth_token'));
+        console.log("🔍 Current user from context:", user);
+        
+        // Redirect based on user role
+        switch (role) {
+          case "zone_admin":
+            console.log("🚀 Redirecting zone_admin to /dashboard/zone-data");
+            router.replace("/dashboard/zone-data");
+            break;
+          case "central_admin":
+            console.log("🚀 Redirecting central_admin to /dashboard/zones");
+            router.replace("/dashboard/zones");
+            break;
+          case "investor":
+            console.log("🚀 Redirecting investor to /dashboard");
+            router.replace("/dashboard");
+            break;
+          default:
+            console.log("🚀 Redirecting to default /dashboard");
+            router.replace("/dashboard");
+        }
       } else {
+        console.log("❌ Demo login failed");
         setError("Demo login failed. Please try again.");
       }
     } catch (err) {
+      console.error("💥 Demo login error:", err);
       setError("Demo login failed. Please try again.");
     } finally {
       setIsLoading(false);
