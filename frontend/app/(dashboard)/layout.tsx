@@ -52,7 +52,15 @@ export default function DashboardLayout({
   const router = useRouter();
 
   useEffect(() => {
+    console.log(" Dashboard Layout - Auth Check:", { 
+      loading, 
+      isAuthenticated, 
+      user: user?.role,
+      hasUser: !!user 
+    });
+    
     if (!loading && !isAuthenticated) {
+      console.log(" Dashboard Layout - Redirecting to login (not authenticated)");
       router.replace("/login");
     }
   }, [loading, isAuthenticated, router]);
