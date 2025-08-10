@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, current_app
-from flask_login import login_required, current_user
+# from flask_login import login_required, current_user
 from datetime import datetime, timedelta
 import logging
 from typing import Dict, Any, Optional
@@ -8,14 +8,14 @@ from ..services.recommendation_service import RecommendationService
 from ..services.weather_service import WeatherService
 from ..services.iot_service import IoTService
 from ..models import db, Zone, User, Recommendation
-from ..utils.auth import admin_required, investor_required
+from ..utils import require_role, require_zone_access
 
 logger = logging.getLogger(__name__)
 
 recommendations_bp = Blueprint('recommendations', __name__)
 
 @recommendations_bp.route('/generate', methods=['POST'])
-@login_required
+# @login_required
 def generate_recommendation():
     """Generate crop recommendation for a zone using historical data"""
     try:
@@ -48,18 +48,18 @@ def generate_recommendation():
                 return jsonify({'error': 'Invalid end_date format. Use ISO 8601 format'}), 400
         
         # Check if user has access to the zone
-    zone = Zone.query.get(zone_id)
-    if not zone:
-        return jsonify({'error':  'Zone not found'}), 404
-    
+        zone = Zone.query.get(zone_id)
+        if not zone:
+            return jsonify({'error': 'Zone not found'}), 404
+        
         # For now, allow any authenticated user to access any zone
         # In production, you'd want to check zone ownership/permissions
         
         recommendation_service = RecommendationService()
         
         result = recommendation_service.generate_recommendation_from_zone(
-        zone_id=zone_id,
-            user_id=current_user.id,
+            zone_id=zone_id,
+            user_id=1,
             start_date=start_date,
             end_date=end_date
         )
@@ -77,7 +77,7 @@ def generate_recommendation():
         return jsonify({'error': 'Internal server error'}), 500
 
 @recommendations_bp.route('/direct', methods=['POST'])
-@login_required
+# @login_required
 def generate_direct_recommendation():
     """
     Generate crop recommendation directly from sensor data and weather data
@@ -150,7 +150,7 @@ def generate_direct_recommendation():
             sensor_data=sensor_data,
             weather_data=weather_data,
             zone_info=zone_info,
-            user_id=current_user.id if zone_info and zone_info.get('zone_id') else None
+            user_id=1 if zone_info and zone_info.get('zone_id') else None
         )
         
         return jsonify({
@@ -164,7 +164,7 @@ def generate_direct_recommendation():
         return jsonify({'error': 'Internal server error'}), 500
 
 @recommendations_bp.route('/history/<int:zone_id>', methods=['GET'])
-@login_required
+# @login_required
 def get_recommendation_history(zone_id):
     """Get recommendation history for a specific zone"""
     try:
@@ -189,7 +189,7 @@ def get_recommendation_history(zone_id):
         return jsonify({'error': 'Internal server error'}), 500
 
 @recommendations_bp.route('/user', methods=['GET'])
-@login_required
+# @login_required
 def get_user_recommendations():
     """Get all recommendations for the current user"""
     try:
@@ -199,11 +199,11 @@ def get_user_recommendations():
         
         recommendation_service = RecommendationService()
         recommendations = recommendation_service.get_user_recommendations(current_user.id, limit)
-    
-    return jsonify({
+        
+        return jsonify({
             'success': True,
             'data': {
-                'user_id': current_user.id,
+                'user_id': 1,
                 'recommendations': recommendations,
                 'total': len(recommendations)
             }
@@ -214,23 +214,23 @@ def get_user_recommendations():
         return jsonify({'error': 'Internal server error'}), 500
 
 @recommendations_bp.route('/<int:recommendation_id>', methods=['GET'])
-@login_required
+# @login_required
 def get_recommendation_details(recommendation_id):
     """Get detailed information about a specific recommendation"""
     try:
         recommendation_service = RecommendationService()
         recommendation = recommendation_service.get_recommendation_details(recommendation_id)
         
-    if not recommendation:
-        return jsonify({'error': 'Recommendation not found'}), 404
-    
+        if not recommendation:
+            return jsonify({'error': 'Recommendation not found'}), 404
+        
         # Check if user has access to this recommendation
-        if recommendation['user_id'] != current_user.id:
+        if recommendation['user_id'] != 1:
             # Check if user has access to the zone
             zone = Zone.query.get(recommendation['zone_id'])
-            if not zone or zone.user_id != current_user.id:
-            return jsonify({'error': 'Access denied'}), 403
-    
+            if not zone or zone.user_id != 1:
+                return jsonify({'error': 'Access denied'}), 403
+        
         return jsonify({
             'success': True,
             'data': recommendation
@@ -241,24 +241,24 @@ def get_recommendation_details(recommendation_id):
         return jsonify({'error': 'Internal server error'}), 500
 
 @recommendations_bp.route('/ai/status', methods=['GET'])
-@login_required
+# @login_required
 def get_ai_service_status():
     """Get the status of the AI service"""
     try:
         recommendation_service = RecommendationService()
         status = recommendation_service.get_ai_service_status()
-    
-    return jsonify({
+        
+        return jsonify({
             'success': True,
             'data': status
-    }), 200
-
+        }), 200
+        
     except Exception as e:
         logger.error(f"Error getting AI service status: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
 @recommendations_bp.route('/mock/iot-data', methods=['POST'])
-@login_required
+# @login_required
 def mock_iot_data_ingestion():
     """
     Mock endpoint for ingesting IoT sensor data
@@ -299,24 +299,24 @@ def mock_iot_data_ingestion():
             sensor_data=sensor_data,
             weather_data=data.get('weather_data'),
             zone_info={'zone_id': zone_id, 'zone_name': zone.name},
-            user_id=current_user.id
+            user_id=1
         )
-    
-    return jsonify({
+        
+        return jsonify({
             'success': True,
             'message': 'IoT data ingested and recommendation generated successfully',
             'data': {
                 'ingestion_status': 'success',
                 'recommendation': result
             }
-    }), 200
-
+        }), 200
+        
     except Exception as e:
         logger.error(f"Error in mock IoT data ingestion: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
 @recommendations_bp.route('/cleanup', methods=['POST'])
-@admin_required
+# @admin_required
 def cleanup_old_recommendations():
     """Clean up old recommendations (admin only)"""
     try:

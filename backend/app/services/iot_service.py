@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, desc, func
 import json
 
-from ..models import db, IoT, SensorData, Zone, User
+from ..models import db, IoT, Zone, ZoneLandCondition
 
 logger = logging.getLogger(__name__)
 
@@ -45,13 +45,13 @@ class IoTService:
             if not start_date:
                 start_date = end_date - timedelta(days=7)
             
-            sensor_data = SensorData.query.filter(
+            sensor_data = ZoneLandCondition.query.filter(
                 and_(
-                    SensorData.device_id == device_id,
-                    SensorData.timestamp >= start_date,
-                    SensorData.timestamp <= end_date
+                    ZoneLandCondition.device_id == device_id,
+                    ZoneLandCondition.timestamp >= start_date,
+                    ZoneLandCondition.timestamp <= end_date
                 )
-            ).order_by(desc(SensorData.timestamp)).limit(limit).all()
+            ).order_by(desc(ZoneLandCondition.timestamp)).limit(limit).all()
             
             return [{
                 'id': data.id,
@@ -77,9 +77,9 @@ class IoTService:
         try:
             # Get the most recent sensor data for each device in the zone
             latest_readings = db.session.query(
-                SensorData.device_id,
-                func.max(SensorData.timestamp).label('latest_timestamp')
-            ).filter(SensorData.zone_id == zone_id).group_by(SensorData.device_id).all()
+                ZoneLandCondition.device_id,
+                func.max(ZoneLandCondition.timestamp).label('latest_timestamp')
+            ).filter(ZoneLandCondition.zone_id == zone_id).group_by(ZoneLandCondition.device_id).all()
             
             if not latest_readings:
                 return {}
@@ -87,10 +87,10 @@ class IoTService:
             # Get the actual sensor data for these latest timestamps
             sensor_data = []
             for device_id, latest_timestamp in latest_readings:
-                data = SensorData.query.filter(
+                data = ZoneLandCondition.query.filter(
                     and_(
-                        SensorData.device_id == device_id,
-                        SensorData.timestamp == latest_timestamp
+                        ZoneLandCondition.device_id == device_id,
+                        ZoneLandCondition.timestamp == latest_timestamp
                     )
                 ).first()
                 
@@ -131,7 +131,7 @@ class IoTService:
             device_id = sensor_data.get('device_id', f"mock_device_{zone_id}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}")
             
             # Create sensor data record
-            sensor_record = SensorData(
+            sensor_record = ZoneLandCondition(
                 zone_id=zone_id,
                 device_id=device_id,
                 timestamp=datetime.utcnow(),
@@ -172,11 +172,11 @@ class IoTService:
             start_date = end_date - timedelta(days=days)
             
             # Get all sensor data for the period
-            sensor_data = SensorData.query.filter(
+            sensor_data = ZoneLandCondition.query.filter(
                 and_(
-                    SensorData.zone_id == zone_id,
-                    SensorData.timestamp >= start_date,
-                    SensorData.timestamp <= end_date
+                    ZoneLandCondition.zone_id == zone_id,
+                    ZoneLandCondition.timestamp >= start_date,
+                    ZoneLandCondition.timestamp <= end_date
                 )
             ).all()
             
@@ -256,7 +256,7 @@ class IoTService:
             'recommendation': 'High quality data' if quality_score >= 90 else 'Good quality data' if quality_score >= 70 else 'Moderate quality data' if quality_score >= 50 else 'Poor quality data - verification recommended'
         }
     
-    def _assess_data_quality_summary(self, sensor_data_list: List[SensorData]) -> Dict[str, Any]:
+    def _assess_data_quality_summary(self, sensor_data_list: List[ZoneLandCondition]) -> Dict[str, Any]:
         """Assess the overall quality of sensor data for a zone"""
         if not sensor_data_list:
             return {'overall_quality': 'No data', 'completeness': 0, 'issues': ['No sensor data available']}

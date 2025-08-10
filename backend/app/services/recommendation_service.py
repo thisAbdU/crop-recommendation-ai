@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, desc, func
 import json
 
-from ..models import db, Recommendation, Zone, SensorData, WeatherData, User
+from ..models import db, Recommendation, Zone, ZoneLandCondition
 from .ai_client import AIClient
 from .weather_service import WeatherService
 from .iot_service import IoTService
@@ -234,11 +234,11 @@ class RecommendationService:
         """Get aggregated sensor data for a zone within a date range"""
         try:
             # Get all sensor data for the zone in the date range
-            sensor_data = SensorData.query.filter(
+            sensor_data = ZoneLandCondition.query.filter(
                 and_(
-                    SensorData.zone_id == zone_id,
-                    SensorData.timestamp >= start_date,
-                    SensorData.timestamp <= end_date
+                    ZoneLandCondition.zone_id == zone_id,
+                    ZoneLandCondition.timestamp >= start_date,
+                    ZoneLandCondition.timestamp <= end_date
                 )
             ).all()
             
@@ -311,11 +311,11 @@ class RecommendationService:
         """Get weather data for a zone within a date range"""
         try:
             # Get weather data for the zone in the date range
-            weather_data = WeatherData.query.filter(
+            weather_data = ZoneLandCondition.query.filter(
                 and_(
-                    WeatherData.zone_id == zone_id,
-                    WeatherData.timestamp >= start_date,
-                    WeatherData.timestamp <= end_date
+                    ZoneLandCondition.zone_id == zone_id,
+                    ZoneLandCondition.timestamp >= start_date,
+                    ZoneLandCondition.timestamp <= end_date
                 )
             ).all()
             

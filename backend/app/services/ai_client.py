@@ -201,7 +201,7 @@ class AIClient:
             texture = 'Sandy'
         elif moisture < 35:
             texture = 'Loamy'
-            else:
+        else:
             texture = 'Clay'
         
         return f"{texture} {base_type}"
@@ -243,7 +243,7 @@ class AIClient:
             rationale += "and optimal temperature conditions."
         elif 15 <= temp < 20 or 30 < temp <= 35:
             rationale += "and acceptable temperature conditions."
-            else:
+        else:
             rationale += "and temperature conditions may need monitoring."
         
         return rationale
@@ -313,7 +313,7 @@ class AIClient:
             return "Moderate"
         elif moisture < 45:
             return "Moist"
-            else:
+        else:
             return "Very Moist"
     
     def _assess_data_quality(self, sensor_data):
@@ -447,7 +447,7 @@ class AIClient:
         try:
             if self.ai_mode == 'local':
                 return self.model is not None and self.scaler is not None
-        else:
+            else:
                 response = requests.get(f"{self.remote_url}/health", timeout=10)
                 return response.status_code == 200
         except Exception as e:
