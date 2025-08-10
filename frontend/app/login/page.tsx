@@ -52,7 +52,7 @@ export default function LoginPage() {
           // Redirect based on user role
           switch (user.role) {
             case "zone_admin":
-              router.push("/dashboard/zone-data");
+              router.push("/dashboard");
               break;
             case "central_admin":
               router.push("/dashboard/zones");
@@ -166,19 +166,15 @@ export default function LoginPage() {
         // Redirect based on user role
         switch (role) {
           case "zone_admin":
-            console.log("🚀 Redirecting zone_admin to /dashboard/zone-data");
-            router.replace("/dashboard/zone-data");
+            router.replace("/dashboard/");
             break;
           case "central_admin":
-            console.log("🚀 Redirecting central_admin to /dashboard/zones");
             router.replace("/dashboard/zones");
             break;
           case "investor":
-            console.log("🚀 Redirecting investor to /dashboard");
             router.replace("/dashboard");
             break;
           default:
-            console.log("🚀 Redirecting to default /dashboard");
             router.replace("/dashboard");
         }
       } else {
