@@ -53,7 +53,6 @@ def login(args):
 @blp.arguments(UserSchema, location='json')
 @blp.response(201, UserSchema, description="User created successfully")
 @blp.response(400, description="Validation error")
-@blp.response(401, description="Unauthorized - JWT token required")
 @blp.response(403, description="Unauthorized - central_admin required")
 @blp.response(409, description="User already exists")
 @blp.doc(
@@ -63,13 +62,7 @@ def login(args):
 @jwt_required()
 def register(args):
     """Register new user - central_admin only for zone_admin registration"""
-    current_user_id = get_jwt_identity()
-    current_user = User.query.get(current_user_id)
     
-    # if not current_user or current_user.role != UserRole.CENTRAL_ADMIN:
-    #     abort(403, message="Unauthorized - central_admin required")
-    
-    # Check if user already exists
     if args.get('email') and User.query.filter_by(email=args['email']).first():
         abort(409, message="Email already registered")
     
