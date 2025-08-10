@@ -1,4 +1,4 @@
-import { apiClient, LoginCredentials, LoginResponse } from './api';
+import { apiClient, LoginCredentials, LoginResponse, SignupCredentials, SignupResponse } from './api';
 
 export interface User {
   name: string;
@@ -26,6 +26,17 @@ export class AuthService {
     localStorage.setItem('auth_token', token);
     
     return { user, token };
+  }
+
+  // Signup user
+  static async signup(credentials: SignupCredentials): Promise<SignupResponse | null> {
+    const response = await apiClient.signup(credentials);
+    
+    if (response.error || !response.data) {
+      throw new Error(response.error || 'Signup failed');
+    }
+
+    return response.data;
   }
 
   // Logout user

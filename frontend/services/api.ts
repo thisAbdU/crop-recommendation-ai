@@ -12,6 +12,15 @@ export interface LoginCredentials {
   password: string;
 }
 
+export interface SignupCredentials {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  company: string;
+  phone?: string;
+}
+
 export interface LoginResponse {
   user: {
     name: string;
@@ -19,6 +28,16 @@ export interface LoginResponse {
     role: string;
   };
   token: string;
+}
+
+export interface SignupResponse {
+  user: {
+    name: string;
+    email: string;
+    company: string;
+    role: string;
+  };
+  message: string;
 }
 
 // Base API client
@@ -73,6 +92,13 @@ class ApiClient {
   // Auth endpoints
   async login(credentials: LoginCredentials): Promise<ApiResponse<LoginResponse>> {
     return this.request<LoginResponse>('/api/auth/login/', {
+      method: 'POST',
+      body: JSON.stringify(credentials),
+    });
+  }
+
+  async signup(credentials: SignupCredentials): Promise<ApiResponse<SignupResponse>> {
+    return this.request<SignupResponse>('/api/auth/signup/', {
       method: 'POST',
       body: JSON.stringify(credentials),
     });
