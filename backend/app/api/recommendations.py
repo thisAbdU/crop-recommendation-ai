@@ -1,341 +1,343 @@
-from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
-from app import db
-from app.models import Recommendation, Zone, User, UserRole, RecommendationStatus
-from app.schemas import RecommendationSchema, RecommendationRequestSchema, PaginationSchema
-from app.utils import require_role, audit_log, paginate_query, require_zone_access
-from app.services.recommendation_service import RecommendationService
-from marshmallow import ValidationError
-from datetime import datetime
+from flask import Blueprint, request, jsonify, current_app
+from flask_login import login_required, current_user
+from datetime import datetime, timedelta
+import logging
+from typing import Dict, Any, Optional
+
+from ..services.recommendation_service import RecommendationService
+from ..services.weather_service import WeatherService
+from ..services.iot_service import IoTService
+from ..models import db, Zone, User, Recommendation
+from ..utils.auth import admin_required, investor_required
+
+logger = logging.getLogger(__name__)
 
 recommendations_bp = Blueprint('recommendations', __name__)
-recommendation_schema = RecommendationSchema()
-recommendation_request_schema = RecommendationRequestSchema()
-pagination_schema = PaginationSchema()
 
-@recommendations_bp.route('/zones/<int:zone_id>/recommend', methods=['POST'])
-@jwt_required()
-@require_role('zone_admin', 'central_admin')
-@require_zone_access('zone_id')
-def trigger_recommendation(zone_id):
-    """Trigger a crop suitability recommendation for a zone"""
-    current_user_id = get_jwt_identity()
-    
-    # Verify zone exists
+@recommendations_bp.route('/generate', methods=['POST'])
+@login_required
+def generate_recommendation():
+    """Generate crop recommendation for a zone using historical data"""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        zone_id = data.get('zone_id')
+        start_date_str = data.get('start_date')
+        end_date_str = data.get('end_date')
+        
+        if not zone_id:
+            return jsonify({'error': 'zone_id is required'}), 400
+        
+        # Parse dates if provided
+        start_date = None
+        end_date = None
+        
+        if start_date_str:
+            try:
+                start_date = datetime.fromisoformat(start_date_str.replace('Z', '+00:00'))
+            except ValueError:
+                return jsonify({'error': 'Invalid start_date format. Use ISO 8601 format'}), 400
+        
+        if end_date_str:
+            try:
+                end_date = datetime.fromisoformat(end_date_str.replace('Z', '+00:00'))
+            except ValueError:
+                return jsonify({'error': 'Invalid end_date format. Use ISO 8601 format'}), 400
+        
+        # Check if user has access to the zone
     zone = Zone.query.get(zone_id)
     if not zone:
-        return jsonify({'error': 'Zone not found'}), 404
+        return jsonify({'error':  'Zone not found'}), 404
     
-    try:
-        data = recommendation_request_schema.load(request.get_json())
-    except ValidationError as err:
-        return jsonify({'error': 'Validation error', 'details': err.messages}), 400
-    
-    # Validate time range
-    if data['start'] >= data['end']:
-        return jsonify({'error': 'Start time must be before end time'}), 400
-    
-    # Check if there's already a pending recommendation for this zone and time range
-    existing_pending = Recommendation.query.filter_by(
+        # For now, allow any authenticated user to access any zone
+        # In production, you'd want to check zone ownership/permissions
+        
+        recommendation_service = RecommendationService()
+        
+        result = recommendation_service.generate_recommendation_from_zone(
         zone_id=zone_id,
-        status=RecommendationStatus.PENDING
-    ).first()
-    
-    if existing_pending:
-        return jsonify({'error': 'There is already a pending recommendation for this zone'}), 409
-    
-    # Create recommendation record
-    recommendation = Recommendation(
-        zone_id=zone_id,
-        start_time=data['start'],
-        end_time=data['end'],
-        prompt_template_id=data.get('prompt_template_id'),
-        created_by=current_user_id,
-        status=RecommendationStatus.PENDING
-    )
-    
-    db.session.add(recommendation)
-    db.session.commit()
-    
-    # Enqueue background task
-    try:
-        from app.tasks.rec_tasks import generate_recommendation_task
-        generate_recommendation_task.delay(recommendation.id)
+            user_id=current_user.id,
+            start_date=start_date,
+            end_date=end_date
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': 'Recommendation generated successfully',
+            'data': result
+        }), 200
+        
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
     except Exception as e:
-        # If task enqueue fails, mark as failed
-        recommendation.status = RecommendationStatus.FAILED
-        recommendation.response = f"Failed to enqueue task: {str(e)}"
-        db.session.commit()
-        return jsonify({'error': 'Failed to start recommendation generation'}), 500
-    
-    # Audit log
-    audit_log(current_user_id, 'recommendation_triggered', 'recommendation', recommendation.id, {
-        'zone_id': zone_id,
-        'start_time': data['start'].isoformat(),
-        'end_time': data['end'].isoformat()
-    })
+        logger.error(f"Error generating recommendation: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@recommendations_bp.route('/direct', methods=['POST'])
+@login_required
+def generate_direct_recommendation():
+    """
+    Generate crop recommendation directly from sensor data and weather data
+    This endpoint is useful for real-time recommendations from IoT devices
+    """
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        sensor_data = data.get('sensor_data', {})
+        weather_data = data.get('weather_data', {})
+        zone_info = data.get('zone_info', {})
+        
+        if not sensor_data:
+            return jsonify({'error': 'sensor_data is required'}), 400
+        
+        # Validate required sensor data fields
+        required_fields = ['nitrogen', 'phosphorus', 'potassium', 'ph', 'soil_moisture']
+        missing_fields = [field for field in required_fields if field not in sensor_data or sensor_data[field] is None]
+        
+        if missing_fields:
+            return jsonify({
+                'error': f'Missing required sensor data fields: {missing_fields}',
+                'required_fields': required_fields
+            }), 400
+        
+        # Validate data types and ranges
+        validation_errors = []
+        
+        # pH validation
+        if 'ph' in sensor_data:
+            try:
+                ph = float(sensor_data['ph'])
+                if not (3.0 <= ph <= 11.0):
+                    validation_errors.append('pH must be between 3.0 and 11.0')
+            except (ValueError, TypeError):
+                validation_errors.append('pH must be a valid number')
+        
+        # Soil moisture validation
+        if 'soil_moisture' in sensor_data:
+            try:
+                moisture = float(sensor_data['soil_moisture'])
+                if not (0 <= moisture <= 100):
+                    validation_errors.append('Soil moisture must be between 0 and 100')
+            except (ValueError, TypeError):
+                validation_errors.append('Soil moisture must be a valid number')
+        
+        # Nutrient validation
+        for nutrient in ['nitrogen', 'phosphorus', 'potassium']:
+            if nutrient in sensor_data:
+                try:
+                    value = float(sensor_data[nutrient])
+                    if value < 0:
+                        validation_errors.append(f'{nutrient.capitalize()} must be non-negative')
+                except (ValueError, TypeError):
+                    validation_errors.append(f'{nutrient.capitalize()} must be a valid number')
+        
+        if validation_errors:
+            return jsonify({
+                'error': 'Data validation failed',
+                'validation_errors': validation_errors
+            }), 400
+        
+        recommendation_service = RecommendationService()
+        
+        # Generate recommendation
+        result = recommendation_service.generate_recommendation_from_sensors(
+            sensor_data=sensor_data,
+            weather_data=weather_data,
+            zone_info=zone_info,
+            user_id=current_user.id if zone_info and zone_info.get('zone_id') else None
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': 'Direct recommendation generated successfully',
+            'data': result
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error generating direct recommendation: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@recommendations_bp.route('/history/<int:zone_id>', methods=['GET'])
+@login_required
+def get_recommendation_history(zone_id):
+    """Get recommendation history for a specific zone"""
+    try:
+        limit = request.args.get('limit', 10, type=int)
+        if limit > 100:
+            limit = 100
+        
+        recommendation_service = RecommendationService()
+        history = recommendation_service.get_recommendation_history(zone_id, limit)
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'zone_id': zone_id,
+                'history': history,
+                'total': len(history)
+            }
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting recommendation history: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@recommendations_bp.route('/user', methods=['GET'])
+@login_required
+def get_user_recommendations():
+    """Get all recommendations for the current user"""
+    try:
+        limit = request.args.get('limit', 20, type=int)
+        if limit > 100:
+            limit = 100
+        
+        recommendation_service = RecommendationService()
+        recommendations = recommendation_service.get_user_recommendations(current_user.id, limit)
     
     return jsonify({
-        'recommendation_id': recommendation.id,
-        'status': recommendation.status.value,
-        'message': 'Recommendation generation started'
-    }), 202
+            'success': True,
+            'data': {
+                'user_id': current_user.id,
+                'recommendations': recommendations,
+                'total': len(recommendations)
+            }
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting user recommendations: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
 
 @recommendations_bp.route('/<int:recommendation_id>', methods=['GET'])
-@jwt_required()
-def get_recommendation(recommendation_id):
-    """Get specific recommendation details"""
-    current_user_id = get_jwt_identity()
-    current_user = User.query.get(current_user_id)
-    
-    recommendation = Recommendation.query.get(recommendation_id)
-    if not recommendation:
-        return jsonify({'error': 'Recommendation not found'}), 404
-    
-    # Check access permissions
-    if current_user.role == UserRole.EXPORTER:
-        # Exporters can only see approved recommendations
-        if recommendation.status != RecommendationStatus.APPROVED:
-            return jsonify({'error': 'Access denied'}), 403
-    elif current_user.role == UserRole.ZONE_ADMIN:
-        # Zone admins can see recommendations for their zones
-        if recommendation.zone_id != current_user.zone_id:
-            return jsonify({'error': 'Access denied'}), 403
-    elif current_user.role == UserRole.TECHNICIAN:
-        # Technicians can see recommendations for zones they're assigned to
-        if recommendation.zone_id != current_user.zone_id:
-            return jsonify({'error': 'Access denied'}), 403
-    
-    recommendation_data = recommendation_schema.dump(recommendation)
-    
-    # Add zone info
-    recommendation_data['zone'] = {
-        'id': recommendation.zone.id,
-        'name': recommendation.zone.name
-    }
-    
-    # Add creator info
-    if recommendation.created_by_user:
-        recommendation_data['created_by'] = {
-            'id': recommendation.created_by_user.id,
-            'first_name': recommendation.created_by_user.first_name,
-            'last_name': recommendation.created_by_user.last_name
-        }
-    
-    # Add approver info
-    if recommendation.approved_by_user:
-        recommendation_data['approved_by'] = {
-            'id': recommendation.approved_by_user.id,
-            'first_name': recommendation.approved_by_user.first_name,
-            'last_name': recommendation.approved_by_user.last_name
-        }
-    
-    return jsonify(recommendation_data), 200
-
-@recommendations_bp.route('/<int:recommendation_id>/regenerate', methods=['POST'])
-@jwt_required()
-@require_role('zone_admin', 'central_admin')
-def regenerate_recommendation(recommendation_id):
-    """Regenerate a recommendation"""
-    current_user_id = get_jwt_identity()
-    current_user = User.query.get(current_user_id)
-    
-    recommendation = Recommendation.query.get(recommendation_id)
-    if not recommendation:
-        return jsonify({'error': 'Recommendation not found'}), 404
-    
-    # Check access permissions
-    if current_user.role == UserRole.ZONE_ADMIN:
-        if recommendation.zone_id != current_user.zone_id:
-            return jsonify({'error': 'Access denied'}), 403
-    
-    # Mark current recommendation as regenerated
-    recommendation.status = RecommendationStatus.REGENERATED
-    db.session.commit()
-    
-    # Create new recommendation record
-    new_recommendation = Recommendation(
-        zone_id=recommendation.zone_id,
-        start_time=recommendation.start_time,
-        end_time=recommendation.end_time,
-        prompt_template_id=recommendation.prompt_template_id,
-        created_by=current_user_id,
-        status=RecommendationStatus.PENDING
-    )
-    
-    db.session.add(new_recommendation)
-    db.session.commit()
-    
-    # Enqueue background task
+@login_required
+def get_recommendation_details(recommendation_id):
+    """Get detailed information about a specific recommendation"""
     try:
-        from app.tasks.rec_tasks import generate_recommendation_task
-        generate_recommendation_task.delay(new_recommendation.id)
+        recommendation_service = RecommendationService()
+        recommendation = recommendation_service.get_recommendation_details(recommendation_id)
+        
+    if not recommendation:
+        return jsonify({'error': 'Recommendation not found'}), 404
+    
+        # Check if user has access to this recommendation
+        if recommendation['user_id'] != current_user.id:
+            # Check if user has access to the zone
+            zone = Zone.query.get(recommendation['zone_id'])
+            if not zone or zone.user_id != current_user.id:
+            return jsonify({'error': 'Access denied'}), 403
+    
+        return jsonify({
+            'success': True,
+            'data': recommendation
+        }), 200
+        
     except Exception as e:
-        new_recommendation.status = RecommendationStatus.FAILED
-        new_recommendation.response = f"Failed to enqueue task: {str(e)}"
-        db.session.commit()
-        return jsonify({'error': 'Failed to start recommendation regeneration'}), 500
-    
-    # Audit log
-    audit_log(current_user_id, 'recommendation_regenerated', 'recommendation', new_recommendation.id, {
-        'original_recommendation_id': recommendation_id,
-        'zone_id': recommendation.zone_id
-    })
-    
-    return jsonify({
-        'recommendation_id': new_recommendation.id,
-        'status': new_recommendation.status.value,
-        'message': 'Recommendation regeneration started'
-    }), 202
+        logger.error(f"Error getting recommendation details: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
 
-@recommendations_bp.route('/<int:recommendation_id>/approve', methods=['POST'])
-@jwt_required()
-@require_role('zone_admin', 'central_admin')
-def approve_recommendation(recommendation_id):
-    """Approve a recommendation"""
-    current_user_id = get_jwt_identity()
-    current_user = User.query.get(current_user_id)
-    
-    recommendation = Recommendation.query.get(recommendation_id)
-    if not recommendation:
-        return jsonify({'error': 'Recommendation not found'}), 404
-    
-    # Check access permissions
-    if current_user.role == UserRole.ZONE_ADMIN:
-        if recommendation.zone_id != current_user.zone_id:
-            return jsonify({'error': 'Access denied'}), 403
-    
-    # Check if recommendation is in generated state
-    if recommendation.status != RecommendationStatus.GENERATED:
-        return jsonify({'error': 'Only generated recommendations can be approved'}), 400
-    
-    # Approve the recommendation
-    recommendation.status = RecommendationStatus.APPROVED
-    recommendation.approved_by = current_user_id
-    recommendation.approved_at = datetime.utcnow()
-    
-    db.session.commit()
-    
-    # Audit log
-    audit_log(current_user_id, 'recommendation_approved', 'recommendation', recommendation_id, {
-        'zone_id': recommendation.zone_id
-    })
-    
-    return jsonify({
-        'message': 'Recommendation approved successfully',
-        'recommendation_id': recommendation_id
-    }), 200
-
-@recommendations_bp.route('/<int:recommendation_id>/decline', methods=['POST'])
-@jwt_required()
-@require_role('zone_admin', 'central_admin')
-def decline_recommendation(recommendation_id):
-    """Decline a recommendation"""
-    current_user_id = get_jwt_identity()
-    current_user = User.query.get(current_user_id)
-    
-    recommendation = Recommendation.query.get(recommendation_id)
-    if not recommendation:
-        return jsonify({'error': 'Recommendation not found'}), 404
-    
-    # Check access permissions
-    if current_user.role == UserRole.ZONE_ADMIN:
-        if recommendation.zone_id != current_user.zone_id:
-            return jsonify({'error': 'Access denied'}), 403
-    
-    # Check if recommendation is in generated state
-    if recommendation.status != RecommendationStatus.GENERATED:
-        return jsonify({'error': 'Only generated recommendations can be declined'}), 400
-    
-    # Get decline reason from request
-    data = request.get_json() or {}
-    reason = data.get('reason', 'No reason provided')
-    
-    # Decline the recommendation
-    recommendation.status = RecommendationStatus.DECLINED
-    recommendation.response = f"Declined: {reason}"
-    
-    db.session.commit()
-    
-    # Audit log
-    audit_log(current_user_id, 'recommendation_declined', 'recommendation', recommendation_id, {
-        'zone_id': recommendation.zone_id,
-        'reason': reason
-    })
-    
-    return jsonify({
-        'message': 'Recommendation declined successfully',
-        'recommendation_id': recommendation_id
-    }), 200
-
-@recommendations_bp.route('/', methods=['GET'])
-@jwt_required()
-def get_recommendations():
-    """Get recommendations with filtering and pagination"""
-    current_user_id = get_jwt_identity()
-    current_user = User.query.get(current_user_id)
-    
-    # Parse pagination
+@recommendations_bp.route('/ai/status', methods=['GET'])
+@login_required
+def get_ai_service_status():
+    """Get the status of the AI service"""
     try:
-        pagination_data = pagination_schema.load(request.args)
-    except ValidationError as err:
-        return jsonify({'error': 'Invalid pagination parameters', 'details': err.messages}), 400
+        recommendation_service = RecommendationService()
+        status = recommendation_service.get_ai_service_status()
     
-    # Build query based on role
-    query = Recommendation.query
+    return jsonify({
+            'success': True,
+            'data': status
+    }), 200
+
+    except Exception as e:
+        logger.error(f"Error getting AI service status: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@recommendations_bp.route('/mock/iot-data', methods=['POST'])
+@login_required
+def mock_iot_data_ingestion():
+    """
+    Mock endpoint for ingesting IoT sensor data
+    This simulates what would happen when IoT devices send data
+    """
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        # Validate required fields
+        required_fields = ['zone_id', 'sensor_data']
+        missing_fields = [field for field in required_fields if field not in data]
+        
+        if missing_fields:
+            return jsonify({'error': f'Missing required fields: {missing_fields}'}), 400
+        
+        zone_id = data['zone_id']
+        sensor_data = data['sensor_data']
+        
+        # Check if zone exists
+        zone = Zone.query.get(zone_id)
+        if not zone:
+            return jsonify({'error': 'Zone not found'}), 404
+        
+        # In a real implementation, this would store the sensor data
+        # For now, we'll just return a success message
+        logger.info(f"Mock IoT data ingestion for zone {zone_id}: {sensor_data}")
+        
+        # Generate recommendation from the sensor data
+        recommendation_service = RecommendationService()
+        
+        # Add timestamp to sensor data
+        sensor_data['timestamp'] = datetime.utcnow().isoformat()
+        
+        result = recommendation_service.generate_recommendation_from_sensors(
+            sensor_data=sensor_data,
+            weather_data=data.get('weather_data'),
+            zone_info={'zone_id': zone_id, 'zone_name': zone.name},
+            user_id=current_user.id
+        )
     
-    if current_user.role == UserRole.EXPORTER:
-        # Exporters can only see approved recommendations
-        query = query.filter_by(status=RecommendationStatus.APPROVED)
-    elif current_user.role == UserRole.ZONE_ADMIN:
-        # Zone admins see recommendations for their zones
-        query = query.filter_by(zone_id=current_user.zone_id)
-    elif current_user.role == UserRole.TECHNICIAN:
-        # Technicians see recommendations for their zones
-        query = query.filter_by(zone_id=current_user.zone_id)
-    
-    # Filter by status
-    status_filter = request.args.get('status')
-    if status_filter:
-        try:
-            status_enum = RecommendationStatus(status_filter)
-            query = query.filter_by(status=status_enum)
-        except ValueError:
-            return jsonify({'error': 'Invalid status'}), 400
-    
-    # Filter by zone (for central admin)
-    zone_filter = request.args.get('zone_id')
-    if zone_filter and current_user.role == UserRole.CENTRAL_ADMIN:
-        query = query.filter_by(zone_id=int(zone_filter))
-    
-    # Filter by date range
-    start_date = request.args.get('start_date')
-    end_date = request.args.get('end_date')
-    if start_date:
-        try:
-            start = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
-            query = query.filter(Recommendation.created_at >= start)
-        except ValueError:
-            return jsonify({'error': 'Invalid start_date format'}), 400
-    
-    if end_date:
-        try:
-            end = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
-            query = query.filter(Recommendation.created_at <= end)
-        except ValueError:
-            return jsonify({'error': 'Invalid end_date format'}), 400
-    
-    # Paginate results
-    result = paginate_query(
-        query.order_by(Recommendation.created_at.desc()),
-        page=pagination_data['page'],
-        per_page=pagination_data['per_page']
-    )
-    
-    # Add zone info to each recommendation
-    for rec_data in result['items']:
-        zone = Zone.query.get(rec_data['zone_id'])
-        if zone:
-            rec_data['zone_name'] = zone.name
-    
-    return jsonify(result), 200 
+    return jsonify({
+            'success': True,
+            'message': 'IoT data ingested and recommendation generated successfully',
+            'data': {
+                'ingestion_status': 'success',
+                'recommendation': result
+            }
+    }), 200
+
+    except Exception as e:
+        logger.error(f"Error in mock IoT data ingestion: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@recommendations_bp.route('/cleanup', methods=['POST'])
+@admin_required
+def cleanup_old_recommendations():
+    """Clean up old recommendations (admin only)"""
+    try:
+        data = request.get_json() or {}
+        days_to_keep = data.get('days_to_keep', 90)
+        
+        if days_to_keep < 1:
+            return jsonify({'error': 'days_to_keep must be at least 1'}), 400
+        
+        recommendation_service = RecommendationService()
+        deleted_count = recommendation_service.cleanup_old_recommendations(days_to_keep)
+        
+        return jsonify({
+            'success': True,
+            'message': f'Cleanup completed successfully',
+            'data': {
+                'deleted_count': deleted_count,
+                'days_to_keep': days_to_keep
+            }
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error cleaning up old recommendations: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500 

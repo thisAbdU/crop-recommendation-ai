@@ -1,295 +1,385 @@
 import logging
-from datetime import datetime
-from app import db
-from app.models import Recommendation, ZoneLandCondition, RecommendationStatus
-from app.services.ai_client import AIClient
-from app.services.prompt_service import PromptService
-from sqlalchemy import func, and_
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional, Any
+from sqlalchemy.orm import Session
+from sqlalchemy import and_, desc, func
+import json
+
+from ..models import db, Recommendation, Zone, SensorData, WeatherData, User
+from .ai_client import AIClient
+from .weather_service import WeatherService
+from .iot_service import IoTService
 
 logger = logging.getLogger(__name__)
 
 class RecommendationService:
-    """Service for managing recommendation generation pipeline"""
+    """Service for managing crop recommendations"""
     
     def __init__(self):
         self.ai_client = AIClient()
-        self.prompt_service = PromptService()
+        self.weather_service = WeatherService()
+        self.iot_service = IoTService()
     
-    def generate_recommendation(self, recommendation_id):
-        """Generate a recommendation for the given ID"""
+    def generate_recommendation_from_zone(self, zone_id: int, user_id: int, 
+                                        start_date: Optional[datetime] = None, 
+                                        end_date: Optional[datetime] = None) -> Dict[str, Any]:
+        """
+        Generate crop recommendation for a specific zone using historical data
+        
+        Args:
+            zone_id: ID of the zone
+            user_id: ID of the user requesting the recommendation
+            start_date: Start date for data aggregation (defaults to 7 days ago)
+            end_date: End date for data aggregation (defaults to now)
+            
+        Returns:
+            Dict containing the recommendation data
+        """
         try:
-            # Get recommendation record
-            recommendation = Recommendation.query.get(recommendation_id)
-            if not recommendation:
-                raise ValueError(f"Recommendation {recommendation_id} not found")
+            # Set default dates if not provided
+            if not end_date:
+                end_date = datetime.utcnow()
+            if not start_date:
+                start_date = end_date - timedelta(days=7)
             
-            # Update status to processing
-            recommendation.status = RecommendationStatus.PENDING
-            db.session.commit()
+            # Get zone information
+            zone = Zone.query.get(zone_id)
+            if not zone:
+                raise ValueError(f"Zone {zone_id} not found")
             
-            # Get zone data for the time range
-            zone_data = self._get_zone_data(recommendation.zone_id, recommendation.start_time, recommendation.end_time)
+            # Get aggregated sensor data for the zone
+            aggregated_data = self._get_aggregated_zone_data(zone_id, start_date, end_date)
             
-            if not zone_data:
-                raise ValueError("No sensor data found for the specified time range")
-            
-            # Aggregate features
-            aggregated_features = self._aggregate_features(zone_data)
-            
-            # Classify soil
-            soil_classification = self.ai_client.classify_soil(aggregated_features)
-            
-            # Search for similar examples
-            similar_examples = self.ai_client.search_similar(aggregated_features, k=5)
+            # Get weather data for the zone
+            weather_data = self._get_zone_weather_data(zone_id, start_date, end_date)
             
             # Generate recommendation using AI
-            ai_result = self.ai_client.generate_recommendation_from_aggregates(
-                zone_id=recommendation.zone_id,
-                start=recommendation.start_time,
-                end=recommendation.end_time,
-                aggregated_features=aggregated_features,
-                prompt_template_id=recommendation.prompt_template_id
+            ai_result = self.ai_client.generate_crop_recommendation(
+                sensor_data=aggregated_data,
+                weather_data=weather_data,
+                zone_info={
+                    'zone_id': zone_id,
+                    'zone_name': zone.name,
+                    'zone_type': zone.zone_type,
+                    'area': zone.area,
+                    'location': zone.location
+                }
             )
             
-            # Render response using template if available
-            response_text = self._render_response(
-                recommendation, 
-                aggregated_features, 
-                soil_classification, 
-                similar_examples,
-                ai_result
+            # Create recommendation record
+            recommendation = Recommendation(
+                zone_id=zone_id,
+                user_id=user_id,
+                recommendation_data=ai_result,
+                generated_at=datetime.utcnow(),
+                data_start_date=start_date,
+                data_end_date=end_date,
+                ai_model_version='v2.0',
+                confidence_score=ai_result.get('confidence', 0.0)
             )
             
-            # Update recommendation with results
-            recommendation.status = RecommendationStatus.GENERATED
-            recommendation.response = response_text
-            recommendation.crops = ai_result.get('crops', [])
-            recommendation.data_used = {
-                'start_time': recommendation.start_time.isoformat() if recommendation.start_time else None,
-                'end_time': recommendation.end_time.isoformat() if recommendation.end_time else None,
-                'data_points_count': len(zone_data),
-                'aggregated_features': aggregated_features,
-                'soil_classification': soil_classification,
-                'similar_examples_count': len(similar_examples)
+            db.session.add(recommendation)
+            db.session.commit()
+            
+            logger.info(f"Generated recommendation for zone {zone_id} with confidence {ai_result.get('confidence', 0.0)}")
+            
+            return {
+                'recommendation_id': recommendation.id,
+                'zone_id': zone_id,
+                'zone_name': zone.name,
+                'generated_at': recommendation.generated_at.isoformat(),
+                'ai_result': ai_result,
+                'data_quality': ai_result.get('data_quality', {}),
+                'confidence': ai_result.get('confidence', 0.0)
             }
+            
+        except Exception as e:
+            logger.error(f"Error generating recommendation for zone {zone_id}: {str(e)}")
+            db.session.rollback()
+            raise
+    
+    def generate_recommendation_from_sensors(self, sensor_data: Dict[str, Any], 
+                                           weather_data: Optional[Dict[str, Any]] = None,
+                                           zone_info: Optional[Dict[str, Any]] = None,
+                                           user_id: Optional[int] = None) -> Dict[str, Any]:
+        """
+        Generate crop recommendation directly from sensor data and weather data
+        
+        Args:
+            sensor_data: IoT sensor readings
+            weather_data: Optional weather information
+            zone_info: Optional zone information
+            user_id: Optional user ID for storing the recommendation
+            
+        Returns:
+            Dict containing the recommendation data
+        """
+        try:
+            # Generate recommendation using AI
+            ai_result = self.ai_client.generate_crop_recommendation(
+                sensor_data=sensor_data,
+                weather_data=weather_data,
+                zone_info=zone_info
+            )
+            
+            # Store recommendation if user_id is provided
+            if user_id and zone_info and zone_info.get('zone_id'):
+                recommendation = Recommendation(
+                    zone_id=zone_info['zone_id'],
+                    user_id=user_id,
+                    recommendation_data=ai_result,
+                    generated_at=datetime.utcnow(),
+                    data_start_date=datetime.utcnow(),
+                    data_end_date=datetime.utcnow(),
+                    ai_model_version='v2.0',
+                    confidence_score=ai_result.get('confidence', 0.0)
+                )
+                
+                db.session.add(recommendation)
+                db.session.commit()
+                
+                ai_result['recommendation_id'] = recommendation.id
+            
+            logger.info(f"Generated direct recommendation with confidence {ai_result.get('confidence', 0.0)}")
+            
+            return ai_result
+            
+        except Exception as e:
+            logger.error(f"Error generating direct recommendation: {str(e)}")
+            if user_id and zone_info and zone_info.get('zone_id'):
+                db.session.rollback()
+            raise
+    
+    def get_recommendation_history(self, zone_id: int, limit: int = 10) -> List[Dict[str, Any]]:
+        """Get recommendation history for a zone"""
+        try:
+            recommendations = Recommendation.query.filter_by(zone_id=zone_id)\
+                .order_by(desc(Recommendation.generated_at))\
+                .limit(limit)\
+                .all()
+            
+            return [{
+                'id': rec.id,
+                'generated_at': rec.generated_at.isoformat(),
+                'confidence_score': rec.confidence_score,
+                'ai_model_version': rec.ai_model_version,
+                'top_crop': rec.recommendation_data.get('crops', [{}])[0].get('crop_name', 'Unknown'),
+                'top_score': rec.recommendation_data.get('crops', [{}])[0].get('suitability_score', 0)
+            } for rec in recommendations]
+            
+        except Exception as e:
+            logger.error(f"Error getting recommendation history for zone {zone_id}: {str(e)}")
+            return []
+    
+    def get_user_recommendations(self, user_id: int, limit: int = 20) -> List[Dict[str, Any]]:
+        """Get all recommendations for a user across all zones"""
+        try:
+            recommendations = Recommendation.query.filter_by(user_id=user_id)\
+                .order_by(desc(Recommendation.generated_at))\
+                .limit(limit)\
+                .all()
+            
+            result = []
+            for rec in recommendations:
+                zone = Zone.query.get(rec.zone_id)
+                zone_name = zone.name if zone else f"Zone {rec.zone_id}"
+                
+                result.append({
+                    'id': rec.id,
+                    'zone_id': rec.zone_id,
+                    'zone_name': zone_name,
+                    'generated_at': rec.generated_at.isoformat(),
+                    'confidence_score': rec.confidence_score,
+                    'ai_model_version': rec.ai_model_version,
+                    'top_crop': rec.recommendation_data.get('crops', [{}])[0].get('crop_name', 'Unknown'),
+                    'top_score': rec.recommendation_data.get('crops', [{}])[0].get('suitability_score', 0),
+                    'soil_type': rec.recommendation_data.get('soil_type', 'Unknown'),
+                    'data_quality': rec.recommendation_data.get('data_quality', {})
+                })
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error getting user recommendations for user {user_id}: {str(e)}")
+            return []
+    
+    def get_recommendation_details(self, recommendation_id: int) -> Optional[Dict[str, Any]]:
+        """Get detailed information about a specific recommendation"""
+        try:
+            recommendation = Recommendation.query.get(recommendation_id)
+            if not recommendation:
+                return None
+            
+            zone = Zone.query.get(recommendation.zone_id)
+            zone_name = zone.name if zone else f"Zone {recommendation.zone_id}"
+            
+            return {
+                'id': recommendation.id,
+                'zone_id': recommendation.zone_id,
+                'zone_name': zone_name,
+                'user_id': recommendation.user_id,
+                'generated_at': recommendation.generated_at.isoformat(),
+                'data_start_date': recommendation.data_start_date.isoformat() if recommendation.data_start_date else None,
+                'data_end_date': recommendation.data_end_date.isoformat() if recommendation.data_end_date else None,
+                'ai_model_version': recommendation.ai_model_version,
+                'confidence_score': recommendation.confidence_score,
+                'recommendation_data': recommendation.recommendation_data
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting recommendation details for {recommendation_id}: {str(e)}")
+            return None
+    
+    def _get_aggregated_zone_data(self, zone_id: int, start_date: datetime, end_date: datetime) -> Dict[str, Any]:
+        """Get aggregated sensor data for a zone within a date range"""
+        try:
+            # Get all sensor data for the zone in the date range
+            sensor_data = SensorData.query.filter(
+                and_(
+                    SensorData.zone_id == zone_id,
+                    SensorData.timestamp >= start_date,
+                    SensorData.timestamp <= end_date
+                )
+            ).all()
+            
+            if not sensor_data:
+                # Return default values if no sensor data
+                return {
+                    'nitrogen': 50.0,
+                    'phosphorus': 50.0,
+                    'potassium': 50.0,
+                    'ph': 6.5,
+                    'soil_moisture': 30.0,
+                    'temperature': 25.0,
+                    'humidity': 70.0,
+                    'rainfall': 100.0
+                }
+            
+            # Aggregate the data (use averages for now, could be enhanced with more sophisticated methods)
+            aggregated = {
+                'nitrogen': 0.0,
+                'phosphorus': 0.0,
+                'potassium': 0.0,
+                'ph': 0.0,
+                'soil_moisture': 0.0,
+                'temperature': 0.0,
+                'humidity': 0.0,
+                'rainfall': 0.0
+            }
+            
+            count = len(sensor_data)
+            for data in sensor_data:
+                if data.nitrogen is not None:
+                    aggregated['nitrogen'] += data.nitrogen
+                if data.phosphorus is not None:
+                    aggregated['phosphorus'] += data.phosphorus
+                if data.potassium is not None:
+                    aggregated['potassium'] += data.potassium
+                if data.ph is not None:
+                    aggregated['ph'] += data.ph
+                if data.soil_moisture is not None:
+                    aggregated['soil_moisture'] += data.soil_moisture
+                if data.temperature is not None:
+                    aggregated['temperature'] += data.temperature
+                if data.humidity is not None:
+                    aggregated['humidity'] += data.humidity
+                if data.rainfall is not None:
+                    aggregated['rainfall'] += data.rainfall
+            
+            # Calculate averages
+            for key in aggregated:
+                if count > 0:
+                    aggregated[key] = round(aggregated[key] / count, 2)
+            
+            return aggregated
+                
+        except Exception as e:
+            logger.error(f"Error aggregating zone data: {str(e)}")
+            # Return default values on error
+            return {
+                'nitrogen': 50.0,
+                'phosphorus': 50.0,
+                'potassium': 50.0,
+                'ph': 6.5,
+                'soil_moisture': 30.0,
+                'temperature': 25.0,
+                'humidity': 70.0,
+                'rainfall': 100.0
+            }
+    
+    def _get_zone_weather_data(self, zone_id: int, start_date: datetime, end_date: datetime) -> Dict[str, Any]:
+        """Get weather data for a zone within a date range"""
+        try:
+            # Get weather data for the zone in the date range
+            weather_data = WeatherData.query.filter(
+                and_(
+                    WeatherData.zone_id == zone_id,
+                    WeatherData.timestamp >= start_date,
+                    WeatherData.timestamp <= end_date
+                )
+            ).all()
+            
+            if not weather_data:
+                return {}
+            
+            # Aggregate weather data (use most recent values for current conditions)
+            latest_weather = max(weather_data, key=lambda x: x.timestamp)
+            
+            return {
+                'temperature': latest_weather.temperature,
+                'humidity': latest_weather.humidity,
+                'rainfall': latest_weather.rainfall,
+                'wind_speed': latest_weather.wind_speed,
+                'pressure': latest_weather.pressure,
+                'description': latest_weather.description,
+                'timestamp': latest_weather.timestamp.isoformat()
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting zone weather data: {str(e)}")
+            return {}
+    
+    def get_ai_service_status(self) -> Dict[str, Any]:
+        """Get the status of the AI service"""
+        try:
+            is_connected = self.ai_client.test_connection()
+            
+            return {
+                'status': 'connected' if is_connected else 'disconnected',
+                'ai_mode': self.ai_client.ai_mode,
+                'model_loaded': self.ai_client.model is not None if hasattr(self.ai_client, 'model') else False,
+                'last_test': datetime.utcnow().isoformat()
+            }
+            
+        except Exception as e:
+            logger.error(f"Error checking AI service status: {str(e)}")
+            return {
+                'status': 'error',
+                'error': str(e),
+                'last_test': datetime.utcnow().isoformat()
+            }
+    
+    def cleanup_old_recommendations(self, days_to_keep: int = 90) -> int:
+        """Clean up old recommendations to save storage space"""
+        try:
+            cutoff_date = datetime.utcnow() - timedelta(days=days_to_keep)
+            
+            # Count recommendations to be deleted
+            count = Recommendation.query.filter(
+                Recommendation.generated_at < cutoff_date
+        ).count()
+        
+            # Delete old recommendations
+            Recommendation.query.filter(
+                Recommendation.generated_at < cutoff_date
+            ).delete()
             
             db.session.commit()
             
-            logger.info(f"Successfully generated recommendation {recommendation_id}")
-            return recommendation
+            logger.info(f"Cleaned up {count} old recommendations")
+            return count
             
         except Exception as e:
-            logger.error(f"Error generating recommendation {recommendation_id}: {str(e)}")
-            
-            # Update recommendation status to failed
-            if recommendation:
-                recommendation.status = RecommendationStatus.FAILED
-                recommendation.response = f"Generation failed: {str(e)}"
-                db.session.commit()
-            
-            raise
-    
-    def _get_zone_data(self, zone_id, start_time, end_time):
-        """Get sensor data for a zone within the time range"""
-        query = ZoneLandCondition.query.filter_by(zone_id=zone_id).filter(
-            and_(
-                ZoneLandCondition.read_from_iot_at >= start_time,
-                ZoneLandCondition.read_from_iot_at <= end_time
-            )
-        ).order_by(ZoneLandCondition.read_from_iot_at.asc())
-        
-        return query.all()
-    
-    def _aggregate_features(self, zone_data):
-        """Aggregate sensor data into feature vector"""
-        if not zone_data:
-            return {}
-        
-        # Calculate basic statistics
-        features = {}
-        
-        # Numeric fields to aggregate
-        numeric_fields = [
-            'soil_moisture', 'ph', 'temperature', 'phosphorus', 
-            'potassium', 'humidity', 'nitrogen', 'rainfall'
-        ]
-        
-        for field in numeric_fields:
-            values = [getattr(reading, field) for reading in zone_data if getattr(reading, field) is not None]
-            
-            if values:
-                features[f'{field}_mean'] = sum(values) / len(values)
-                features[f'{field}_min'] = min(values)
-                features[f'{field}_max'] = max(values)
-                features[f'{field}_std'] = self._calculate_std(values)
-                features[f'{field}_count'] = len(values)
-            else:
-                features[f'{field}_mean'] = 0
-                features[f'{field}_min'] = 0
-                features[f'{field}_max'] = 0
-                features[f'{field}_std'] = 0
-                features[f'{field}_count'] = 0
-        
-        # Calculate derived features
-        if features.get('ph_mean', 0) > 0:
-            features['ph_category'] = self._categorize_ph(features['ph_mean'])
-        
-        if features.get('soil_moisture_mean', 0) > 0:
-            features['moisture_category'] = self._categorize_moisture(features['soil_moisture_mean'])
-        
-        # Calculate nutrient ratios
-        if features.get('nitrogen_mean', 0) > 0 and features.get('phosphorus_mean', 0) > 0:
-            features['np_ratio'] = features['nitrogen_mean'] / features['phosphorus_mean']
-        
-        if features.get('nitrogen_mean', 0) > 0 and features.get('potassium_mean', 0) > 0:
-            features['nk_ratio'] = features['nitrogen_mean'] / features['potassium_mean']
-        
-        # Add time-based features
-        if zone_data:
-            features['data_duration_hours'] = (zone_data[-1].read_from_iot_at - zone_data[0].read_from_iot_at).total_seconds() / 3600
-            features['readings_per_hour'] = len(zone_data) / max(features['data_duration_hours'], 1)
-        
-        return features
-    
-    def _calculate_std(self, values):
-        """Calculate standard deviation"""
-        if len(values) < 2:
-            return 0
-        
-        mean = sum(values) / len(values)
-        variance = sum((x - mean) ** 2 for x in values) / (len(values) - 1)
-        return variance ** 0.5
-    
-    def _categorize_ph(self, ph_value):
-        """Categorize pH value"""
-        if ph_value < 5.5:
-            return 'acidic'
-        elif ph_value < 6.5:
-            return 'slightly_acidic'
-        elif ph_value < 7.5:
-            return 'neutral'
-        elif ph_value < 8.5:
-            return 'slightly_alkaline'
-        else:
-            return 'alkaline'
-    
-    def _categorize_moisture(self, moisture_value):
-        """Categorize soil moisture"""
-        if moisture_value < 15:
-            return 'very_dry'
-        elif moisture_value < 25:
-            return 'dry'
-        elif moisture_value < 35:
-            return 'moderate'
-        elif moisture_value < 45:
-            return 'moist'
-        else:
-            return 'very_moist'
-    
-    def _render_response(self, recommendation, aggregated_features, soil_classification, similar_examples, ai_result):
-        """Render recommendation response using template"""
-        try:
-            # Prepare context for template
-            context = {
-                'recommendation': {
-                    'id': recommendation.id,
-                    'zone_id': recommendation.zone_id,
-                    'start_time': recommendation.start_time,
-                    'end_time': recommendation.end_time,
-                    'response': ai_result.get('response', ''),
-                    'crops': ai_result.get('crops', []),
-                    'data_used': recommendation.data_used
-                },
-                'aggregated_features': aggregated_features,
-                'soil_classification': soil_classification,
-                'similar_examples': similar_examples,
-                'crops': ai_result.get('crops', [])
-            }
-            
-            # Use template if available
-            if recommendation.prompt_template_id:
-                try:
-                    return self.prompt_service.render_template(recommendation.prompt_template_id, context)
-                except Exception as e:
-                    logger.warning(f"Failed to render template {recommendation.prompt_template_id}: {str(e)}")
-                    # Fall back to AI result
-                    return ai_result.get('response', 'Recommendation generated successfully.')
-            else:
-                # Use AI result directly
-                return ai_result.get('response', 'Recommendation generated successfully.')
-                
-        except Exception as e:
-            logger.error(f"Error rendering response: {str(e)}")
-            return ai_result.get('response', 'Recommendation generated successfully.')
-    
-    def get_recommendation_summary(self, zone_id, days=30):
-        """Get summary of recommendations for a zone"""
-        from datetime import timedelta
-        
-        end_date = datetime.utcnow()
-        start_date = end_date - timedelta(days=days)
-        
-        recommendations = Recommendation.query.filter_by(zone_id=zone_id).filter(
-            Recommendation.created_at >= start_date
-        ).order_by(Recommendation.created_at.desc()).all()
-        
-        summary = {
-            'total': len(recommendations),
-            'by_status': {},
-            'recent_crops': [],
-            'average_suitability': 0
-        }
-        
-        total_suitability = 0
-        crop_count = 0
-        
-        for rec in recommendations:
-            # Count by status
-            status = rec.status.value
-            summary['by_status'][status] = summary['by_status'].get(status, 0) + 1
-            
-            # Collect recent crops
-            if rec.crops and rec.status == RecommendationStatus.APPROVED:
-                for crop in rec.crops:
-                    summary['recent_crops'].append({
-                        'crop_name': crop.get('crop_name'),
-                        'suitability_score': crop.get('suitability_score', 0),
-                        'recommendation_date': rec.created_at.isoformat() if rec.created_at else None
-                    })
-                    total_suitability += crop.get('suitability_score', 0)
-                    crop_count += 1
-        
-        if crop_count > 0:
-            summary['average_suitability'] = total_suitability / crop_count
-        
-        return summary
-    
-    def validate_recommendation_request(self, zone_id, start_time, end_time):
-        """Validate recommendation request parameters"""
-        errors = []
-        
-        # Check time range
-        if start_time >= end_time:
-            errors.append("Start time must be before end time")
-        
-        if (end_time - start_time).days > 365:
-            errors.append("Time range cannot exceed 1 year")
-        
-        # Check if zone exists
-        from app.models import Zone
-        zone = Zone.query.get(zone_id)
-        if not zone:
-            errors.append("Zone not found")
-        
-        # Check if there's data for the time range
-        data_count = ZoneLandCondition.query.filter_by(zone_id=zone_id).filter(
-            and_(
-                ZoneLandCondition.read_from_iot_at >= start_time,
-                ZoneLandCondition.read_from_iot_at <= end_time
-            )
-        ).count()
-        
-        if data_count == 0:
-            errors.append("No sensor data found for the specified time range")
-        
-        return errors 
+            logger.error(f"Error cleaning up old recommendations: {str(e)}")
+            db.session.rollback()
+            return 0 

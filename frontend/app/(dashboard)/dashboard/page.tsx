@@ -16,7 +16,8 @@ import {
   AlertTriangle, 
   Calendar,
   Target,
-  Eye
+  Eye,
+  RefreshCw
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -27,18 +28,99 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { getDashboardDataForRole, generateRecommendationForZone, mockIoTDataIngestion } from "@/lib/api";
 
 export default function DashboardPage() {
   const [userRole, setUserRole] = useState<Role | null>(null);
   const [userName, setUserName] = useState<string>("");
+  const [investorData, setInvestorData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     const auth = loadAuth();
     if (auth) {
       setUserRole(auth.user.role);
       setUserName(auth.user.name);
+      
+      // Load investor data if user is an investor
+      if (auth.user.role === "investor") {
+        loadInvestorData();
+      }
     }
   }, []);
+
+  const loadInvestorData = async () => {
+    setLoading(true);
+    try {
+      const auth = loadAuth();
+      if (auth) {
+        const data = await getDashboardDataForRole("investor", auth.user);
+        setInvestorData(data || []);
+      }
+    } catch (error) {
+      console.error('Error loading investor data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const refreshRecommendations = async () => {
+    setRefreshing(true);
+    try {
+      // Generate new recommendations for all zones
+      const auth = loadAuth();
+      if (auth && investorData.length > 0) {
+        const updatedData = await Promise.all(
+          investorData.map(async (zoneData) => {
+            try {
+              const newRecommendation = await generateRecommendationForZone(zoneData.zone.id);
+              if (newRecommendation) {
+                return {
+                  ...zoneData,
+                  topRecommendations: [newRecommendation, ...zoneData.topRecommendations.slice(0, 2)],
+                  bestScore: newRecommendation.suitability_score,
+                  lastSensorUpdate: newRecommendation.createdAt
+                };
+              }
+            } catch (error) {
+              console.error(`Error generating recommendation for zone ${zoneData.zone.id}:`, error);
+            }
+            return zoneData;
+          })
+        );
+        setInvestorData(updatedData);
+      }
+    } catch (error) {
+      console.error('Error refreshing recommendations:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const mockIoTDataForZone = async (zoneId: string) => {
+    try {
+      // Generate realistic mock sensor data
+      const mockSensorData = {
+        nitrogen: Math.floor(Math.random() * 100) + 20,
+        phosphorus: Math.floor(Math.random() * 100) + 20,
+        potassium: Math.floor(Math.random() * 100) + 20,
+        ph: (Math.random() * 4) + 5.5, // pH between 5.5-9.5
+        soil_moisture: Math.floor(Math.random() * 60) + 20, // 20-80%
+        temperature: (Math.random() * 20) + 15, // 15-35°C
+        humidity: Math.floor(Math.random() * 40) + 50, // 50-90%
+        rainfall: Math.floor(Math.random() * 200) + 50 // 50-250mm
+      };
+
+      const result = await mockIoTDataIngestion(zoneId, mockSensorData);
+      if (result.success) {
+        // Refresh the data to show new recommendations
+        await loadInvestorData();
+      }
+    } catch (error) {
+      console.error('Error mocking IoT data:', error);
+    }
+  };
 
   const getRoleDisplayName = (role: Role) => {
     switch (role) {
@@ -318,8 +400,12 @@ export default function DashboardPage() {
             <MapPin className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">8</div>
-            <p className="text-xs text-muted-foreground">All performing well</p>
+            <div className="text-2xl font-bold">
+              {loading ? "..." : investorData.length}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {loading ? "Loading..." : "All performing well"}
+            </p>
           </CardContent>
         </Card>
 
@@ -329,8 +415,12 @@ export default function DashboardPage() {
             <Crop className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">24</div>
-            <p className="text-xs text-muted-foreground">Across all zones</p>
+            <div className="text-2xl font-bold">
+              {loading ? "..." : investorData.reduce((total, zone) => total + (zone.topRecommendations?.length || 0), 0)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {loading ? "Loading..." : "Across all zones"}
+            </p>
           </CardContent>
         </Card>
 
@@ -340,8 +430,16 @@ export default function DashboardPage() {
             <Target className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">85%</div>
-            <p className="text-xs text-muted-foreground">Optimal conditions</p>
+            <div className="text-2xl font-bold">
+              {loading ? "..." : 
+                investorData.length > 0 
+                  ? Math.round(investorData.reduce((sum, zone) => sum + (zone.bestScore || 0), 0) / investorData.length)
+                  : 0
+              }%
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {loading ? "Loading..." : "Optimal conditions"}
+            </p>
           </CardContent>
         </Card>
 
@@ -351,16 +449,32 @@ export default function DashboardPage() {
             <Wifi className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">98%</div>
-            <p className="text-xs text-muted-foreground">All systems operational</p>
+            <div className="text-2xl font-bold">
+              {loading ? "..." : "98"}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {loading ? "Loading..." : "All systems operational"}
+            </p>
           </CardContent>
         </Card>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Your Investment Zones</CardTitle>
-          <CardDescription>Overview of all zones associated with your investments</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Your Investment Zones</CardTitle>
+              <CardDescription>Overview of all zones associated with your investments</CardDescription>
+            </div>
+            <Button onClick={refreshRecommendations} disabled={loading || refreshing}>
+              {refreshing ? (
+                <RefreshCw className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              <span className="ml-2">Refresh</span>
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <Table>
@@ -368,156 +482,83 @@ export default function DashboardPage() {
               <TableRow>
                 <TableHead>Zone</TableHead>
                 <TableHead>Location</TableHead>
-                <TableHead>Recommended Crop</TableHead>
-                <TableHead>Suitability Score</TableHead>
+                <TableHead>Recommended Crops</TableHead>
+                <TableHead>Best Suitability Score</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              <TableRow>
-                <TableCell className="font-medium">Green Valley</TableCell>
-                <TableCell>North Region</TableCell>
-                <TableCell>Maize</TableCell>
-                <TableCell>
-                  <Badge variant="secondary" className="bg-green-100 text-green-700">
-                    82%
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <Button asChild size="sm" variant="outline">
-                    <Link href="/zone/z1/chat">
-                      <Eye className="w-4 h-4 mr-2" />
-                      View
-                    </Link>
-                  </Button>
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell className="font-medium">Sun Plains</TableCell>
-                <TableCell>East Region</TableCell>
-                <TableCell>Rice</TableCell>
-                <TableCell>
-                  <Badge variant="secondary" className="bg-green-100 text-green-700">
-                    90%
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <Button asChild size="sm" variant="outline">
-                    <Link href="/zone/z2/chat">
-                      <Eye className="w-4 h-4 mr-2" />
-                      View
-                    </Link>
-                  </Button>
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell className="font-medium">River Bend</TableCell>
-                <TableCell>West Region</TableCell>
-                <TableCell>Wheat</TableCell>
-                <TableCell>
-                  <Badge variant="secondary" className="bg-blue-100 text-blue-700">
-                    76%
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <Button asChild size="sm" variant="outline">
-                    <Link href="/zone/z3/chat">
-                      <Eye className="w-4 h-4 mr-2" />
-                      View
-                    </Link>
-                  </Button>
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell className="font-medium">Mountain View</TableCell>
-                <TableCell>South Region</TableCell>
-                <TableCell>Soybeans</TableCell>
-                <TableCell>
-                  <Badge variant="secondary" className="bg-green-100 text-green-700">
-                    88%
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <Button asChild size="sm" variant="outline">
-                    <Link href="/zone/z4/chat">
-                      <Eye className="w-4 h-4 mr-2" />
-                      View
-                    </Link>
-                  </Button>
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell className="font-medium">Desert Oasis</TableCell>
-                <TableCell>Central Region</TableCell>
-                <TableCell>Millet</TableCell>
-                <TableCell>
-                  <Badge variant="secondary" className="bg-yellow-100 text-yellow-700">
-                    65%
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <Button asChild size="sm" variant="outline">
-                    <Link href="/zone/z5/chat">
-                      <Eye className="w-4 h-4 mr-2" />
-                      View
-                    </Link>
-                  </Button>
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell className="font-medium">Coastal Fields</TableCell>
-                <TableCell>Coastal Region</TableCell>
-                <TableCell>Coconut</TableCell>
-                <TableCell>
-                  <Badge variant="secondary" className="bg-green-100 text-green-700">
-                    92%
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <Button asChild size="sm" variant="outline">
-                    <Link href="/zone/z6/chat">
-                      <Eye className="w-4 h-4 mr-2" />
-                      View
-                    </Link>
-                  </Button>
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell className="font-medium">Highland Farms</TableCell>
-                <TableCell>Highland Region</TableCell>
-                <TableCell>Tea</TableCell>
-                <TableCell>
-                  <Badge variant="secondary" className="bg-green-100 text-green-700">
-                    87%
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <Button asChild size="sm" variant="outline">
-                    <Link href="/zone/z7/chat">
-                      <Eye className="w-4 h-4 mr-2" />
-                      View
-                    </Link>
-                  </Button>
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell className="font-medium">Valley Gardens</TableCell>
-                <TableCell>Valley Region</TableCell>
-                <TableCell>Tomatoes</TableCell>
-                <TableCell>
-                  <Badge variant="secondary" className="bg-blue-100 text-blue-700">
-                    78%
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <Button asChild size="sm" variant="outline">
-                    <Link href="/zone/z8/chat">
-                      <Eye className="w-4 h-4 mr-2" />
-                      View
-                    </Link>
-                  </Button>
-                </TableCell>
-              </TableRow>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                    <p className="text-muted-foreground">Loading investment zones...</p>
+                  </TableCell>
+                </TableRow>
+              ) : investorData.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-8">
+                    <p className="text-muted-foreground">No investment zones found.</p>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                investorData.map((zoneData) => (
+                  <TableRow key={zoneData.zone.id}>
+                    <TableCell className="font-medium">{zoneData.zone.name}</TableCell>
+                    <TableCell>{zoneData.location || zoneData.zone.region}</TableCell>
+                    <TableCell>
+                      {zoneData.topRecommendations && zoneData.topRecommendations.length > 0 ? (
+                        zoneData.topRecommendations.slice(0, 3).map((rec: any, index: number) => (
+                          <div key={index} className="mb-1">
+                            <Badge variant="secondary" className="bg-green-100 text-green-700">
+                              {rec.crop_name}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground ml-2">
+                              {rec.suitability_score}%
+                            </span>
+                          </div>
+                        ))
+                      ) : (
+                        <Badge variant="secondary" className="bg-gray-100 text-gray-700">
+                          No recommendations
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge 
+                        variant="secondary" 
+                        className={
+                          (zoneData.bestScore || 0) >= 80 ? "bg-green-100 text-green-700" :
+                          (zoneData.bestScore || 0) >= 60 ? "bg-blue-100 text-blue-700" :
+                          (zoneData.bestScore || 0) >= 40 ? "bg-yellow-100 text-yellow-700" :
+                          "bg-red-100 text-red-700"
+                        }
+                      >
+                        {zoneData.bestScore || 0}%
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex space-x-2">
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          onClick={() => mockIoTDataForZone(zoneData.zone.id)}
+                          className="text-xs"
+                        >
+                          <RefreshCw className="w-3 h-3 mr-1" />
+                          Mock IoT
+                        </Button>
+                        <Button asChild size="sm" variant="outline">
+                          <Link href={`/zone/${zoneData.zone.id}/chat`}>
+                            <Eye className="w-3 h-3 mr-1" />
+                            View
+                          </Link>
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
@@ -557,27 +598,34 @@ export default function DashboardPage() {
             <CardDescription>Latest zone performance and recommendations</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex items-center space-x-3">
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <div className="flex-1">
-                <p className="text-sm font-medium">New crop recommendation for Green Valley</p>
-                <p className="text-xs text-muted-foreground">2 hours ago</p>
+            {loading ? (
+              <div className="text-center py-4">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto mb-2"></div>
+                <p className="text-sm text-muted-foreground">Loading updates...</p>
               </div>
-            </div>
-            <div className="flex items-center space-x-3">
-              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-              <div className="flex-1">
-                <p className="text-sm font-medium">Sun Plains suitability score improved to 90%</p>
-                <p className="text-xs text-muted-foreground">4 hours ago</p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-3">
-              <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-              <div className="flex-1">
-                <p className="text-sm font-medium">River Bend irrigation system maintenance scheduled</p>
-                <p className="text-xs text-muted-foreground">6 hours ago</p>
-              </div>
-            </div>
+            ) : investorData.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">No recent updates available</p>
+            ) : (
+              investorData.slice(0, 3).map((zoneData, index) => (
+                <div key={index} className="flex items-center space-x-3">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">
+                      {zoneData.topRecommendations && zoneData.topRecommendations.length > 0 
+                        ? `New crop recommendation for ${zoneData.zone.name}: ${zoneData.topRecommendations[0].crop_name}`
+                        : `Zone ${zoneData.zone.name} added to portfolio`
+                      }
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {zoneData.lastSensorUpdate 
+                        ? new Date(zoneData.lastSensorUpdate).toLocaleDateString()
+                        : "Recently"
+                      }
+                    </p>
+                  </div>
+                </div>
+              ))
+            )}
           </CardContent>
         </Card>
       </div>

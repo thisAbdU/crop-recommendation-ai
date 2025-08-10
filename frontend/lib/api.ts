@@ -1,6 +1,128 @@
 import { mockRecommendations, mockSensorData, mockTechnicians, mockUsers, mockZones, mockFarmers, mockDevices } from "./mockData";
 import { Recommendation, Role, SensorDataPoint, Technician, User, Zone, Farmer } from "./types";
 
+// Backend API base URL
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+
+// New API functions for real backend integration
+export async function fetchUserRecommendations(): Promise<Recommendation[]> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/recommendations/user`, {
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data.recommendations || [];
+  } catch (error) {
+    console.error('Error fetching user recommendations:', error);
+    // Fallback to mock data if API fails
+    return mockRecommendations;
+  }
+}
+
+export async function fetchZoneRecommendations(zoneId: string): Promise<Recommendation[]> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/recommendations/history/${zoneId}`, {
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data.recommendations || [];
+  } catch (error) {
+    console.error('Error fetching zone recommendations:', error);
+    // Fallback to mock data if API fails
+    return mockRecommendations.filter(r => r.zoneId === zoneId);
+  }
+}
+
+export async function fetchZones(): Promise<Zone[]> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/zones`, {
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data.zones || [];
+  } catch (error) {
+    console.error('Error fetching zones:', error);
+    // Fallback to mock data if API fails
+    return mockZones;
+  }
+}
+
+export async function generateRecommendationForZone(zoneId: string): Promise<Recommendation | null> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/recommendations/generate`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        zone_id: parseInt(zoneId),
+        start_date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days ago
+        end_date: new Date().toISOString()
+      }),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data.recommendation || null;
+  } catch (error) {
+    console.error('Error generating recommendation:', error);
+    return null;
+  }
+}
+
+export async function mockIoTDataIngestion(zoneId: string, sensorData: any): Promise<any> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/recommendations/mock/iot-data`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        zone_id: parseInt(zoneId),
+        sensor_data: sensorData
+      }),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error mocking IoT data ingestion:', error);
+    return { success: false, error: error.message };
+  }
+}
+
 export async function loginWithJwtMock(email: string, _password: string): Promise<{ token: string; user: User } | null> {
   const user = mockUsers.find((u) => u.email === email);
   if (!user) return null;
@@ -71,33 +193,67 @@ export async function assignTechnicianToZone(technicianId: string, zoneId: strin
 
 export async function getDashboardDataForRole(role: Role, user?: User) {
   if (role === "investor") {
-    return Promise.all(
-      mockZones.map(async (zone) => {
-        const recs = mockRecommendations
-          .filter((r) => r.zoneId === zone.id)
-          .sort((a, b) => b.suitability_score - a.suitability_score);
+    try {
+      // Fetch real data from backend
+      const zones = await fetchZones();
+      const userRecommendations = await fetchUserRecommendations();
+      
+      return Promise.all(
+        zones.map(async (zone) => {
+          // Get recommendations for this zone
+          const zoneRecs = userRecommendations
+            .filter((r) => r.zoneId === zone.id)
+            .sort((a, b) => b.suitability_score - a.suitability_score);
 
-        const data = mockSensorData.filter((d) => d.zoneId === zone.id);
-        const avg = (arr: number[]) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0);
-        const avgPh = Number(avg(data.map((d) => d.ph)).toFixed(2));
-        const avgMoisture = Number(avg(data.map((d) => d.soil_moisture)).toFixed(2));
-        const avgTemp = Number(avg(data.map((d) => d.temperature)).toFixed(2));
-        const lastSensorUpdate = data.length ? new Date(Math.max(...data.map((d) => new Date(d.read_from_iot_at).getTime()))).toISOString() : "";
-        const topSoilType = recs[0]?.key_environmental_factors.soil_type ?? "Unknown";
-        const bestScore = recs[0]?.suitability_score ?? 0;
-        const location = zone.region;
+          // Get the best recommendation for this zone
+          const bestRecommendation = zoneRecs[0];
+          
+          return {
+            zone,
+            topRecommendations: zoneRecs.slice(0, 3),
+            metrics: { 
+              avgPh: bestRecommendation?.key_environmental_factors?.ph || 6.5,
+              avgMoisture: 65, // Default value, could be enhanced with real sensor data
+              avgTemp: 25 // Default value, could be enhanced with real sensor data
+            },
+            lastSensorUpdate: bestRecommendation?.createdAt || new Date().toISOString(),
+            topSoilType: bestRecommendation?.key_environmental_factors?.soil_type || "Unknown",
+            bestScore: bestRecommendation?.suitability_score || 0,
+            location: zone.region,
+          };
+        })
+      );
+    } catch (error) {
+      console.error('Error fetching real dashboard data for investor:', error);
+      // Fallback to mock data if API fails
+      return Promise.all(
+        mockZones.map(async (zone) => {
+          const recs = mockRecommendations
+            .filter((r) => r.zoneId === zone.id)
+            .sort((a, b) => b.suitability_score - a.suitability_score);
 
-        return {
-          zone,
-          topRecommendations: recs.slice(0, 3),
-          metrics: { avgPh, avgMoisture, avgTemp },
-          lastSensorUpdate,
-          topSoilType,
-          bestScore,
-          location,
-        };
-      })
-    );
+          const data = mockSensorData.filter((d) => d.zoneId === zone.id);
+          const avg = (arr: number[]) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0);
+          const avgPh = Number(avg(data.map((d) => d.ph)).toFixed(2));
+          const avgMoisture = Number(avg(data.map((d) => d.soil_moisture)).toFixed(2));
+          const avgTemp = Number(avg(data.map((d) => d.temperature)).toFixed(2));
+          const lastSensorUpdate = data.length ? new Date(Math.max(...data.map((d) => new Date(d.read_from_iot_at).getTime()))).toISOString() : "";
+          const topSoilType = recs[0]?.key_environmental_factors.soil_type ?? "Unknown";
+          const bestScore = recs[0]?.suitability_score ?? 0;
+          const location = zone.region;
+
+          return {
+            zone,
+            topRecommendations: recs.slice(0, 3),
+            metrics: { avgPh, avgMoisture, avgTemp },
+            lastSensorUpdate,
+            topSoilType,
+            bestScore,
+            location,
+          };
+        })
+      );
+    }
   }
 
   if (role === "zone_admin" && user?.zoneId) {
