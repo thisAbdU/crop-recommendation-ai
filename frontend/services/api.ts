@@ -40,6 +40,21 @@ export interface SignupResponse {
   message: string;
 }
 
+// Chat message interface
+export interface ChatMessageRequest {
+  message: string;
+  model?: string;
+}
+
+export interface ChatResponse {
+  reply: string;
+  thread_id?: string;
+  zone_id?: number;
+  zone_name?: string;
+  crops?: string[];
+  context_used?: string[];
+}
+
 // Base API client
 class ApiClient {
   private baseURL: string;
@@ -146,6 +161,36 @@ class ApiClient {
     return this.request<any>('/api/recommendations/generate', {
       method: 'POST',
       body: JSON.stringify(payload),
+    });
+  }
+
+  // Chat endpoints
+  async sendZoneChatMessage(zoneId: number, message: string): Promise<ApiResponse<ChatResponse>> {
+    return this.post<ChatResponse>(`/api/chat/zone/${zoneId}/chat`, {
+      message: message
+    });
+  }
+
+  async sendRecommendationChatMessage(recommendationId: number, message: string): Promise<ApiResponse<ChatResponse>> {
+    return this.post<ChatResponse>(`/api/chat/recommendation/${recommendationId}/message`, {
+      message: message,
+      model: 'gemini'
+    });
+  }
+
+  async testAIChat(message: string): Promise<ApiResponse<any>> {
+    return this.post<any>('/api/chat/ai/test', {
+      message: message
+    });
+  }
+
+  async getAIStatus(): Promise<ApiResponse<any>> {
+    return this.get<any>('/api/chat/ai/status');
+  }
+
+  async testPublicChat(message: string): Promise<ApiResponse<any>> {
+    return this.post<any>('/api/chat/public/test', {
+      message: message
     });
   }
 }

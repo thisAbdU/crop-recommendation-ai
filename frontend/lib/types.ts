@@ -18,7 +18,9 @@ export interface SensorDataPoint {
 
 // User interface
 export interface User {
+  id: number;
   name: string;
+  email: string;
   zone_id?: string;
   role: Role;
 }
@@ -90,6 +92,16 @@ export interface IoTDevice {
   lastReading: string;
   battery: number;
   location: string;
+}
+
+// Technician interface
+export interface Technician {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  status: string;
+  assignedZoneIds?: string[];
 }
 
 // Recommendation interface

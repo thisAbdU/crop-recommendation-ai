@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Send, Bot, User, MapPin, Leaf, Thermometer } from "lucide-react";
+import { apiClient } from "@/services/api";
 
 type Message = { 
   id: string; 
@@ -60,17 +61,47 @@ export function AIChat({
     setInput("");
     setIsLoading(true);
 
-    // Simulate AI response
-    setTimeout(() => {
+    try {
+      // Use the backend AI chat service with Gemini + prompt engineering
+      const response = await apiClient.testAIChat(input.trim());
+      
+      let aiResponse: string;
+      
+      if (response.data?.reply) {
+        // Backend AI response
+        aiResponse = response.data.reply;
+      } else if (response.error) {
+        // Fallback to local response if API fails
+        console.warn('Backend AI chat failed, using fallback response:', response.error);
+        aiResponse = generateAIResponse(input, zoneInfo);
+      } else {
+        aiResponse = generateAIResponse(input, zoneInfo);
+      }
+
       const assistantMsg: Message = {
         id: `a-${Date.now()}`,
         role: "assistant",
-        content: generateAIResponse(input, zoneInfo),
+        content: aiResponse,
         timestamp: new Date()
       };
+      
       setMessages((prev) => [...prev, assistantMsg]);
+    } catch (error) {
+      console.error('Error getting AI response:', error);
+      
+      // Fallback to local response on error
+      const fallbackResponse = generateAIResponse(input, zoneInfo);
+      const assistantMsg: Message = {
+        id: `a-${Date.now()}`,
+        role: "assistant",
+        content: fallbackResponse,
+        timestamp: new Date()
+      };
+      
+      setMessages((prev) => [...prev, assistantMsg]);
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   }
 
   const generateAIResponse = (userInput: string, zoneInfo?: ZoneInfo): string => {

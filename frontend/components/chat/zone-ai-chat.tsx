@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Send, Bot, User, Leaf, Thermometer, Droplets, MapPin, Calendar, TrendingUp } from "lucide-react";
+import { Send, Bot, User, Leaf, Thermometer, Droplets, MapPin, Calendar, TrendingUp, Loader2 } from "lucide-react";
 import { ChatMessage, AIRecommendationCrop, SensorDataPoint } from "@/lib/types";
+import { apiClient } from "@/services/api";
 
 interface ZoneInfo {
   name: string;
@@ -46,7 +47,7 @@ export function ZoneAIChat({
     scrollToBottom();
   }, [messages]);
 
-  const generateAIResponse = (userInput: string): string => {
+  const generateFallbackResponse = (userInput: string): string => {
     const input = userInput.toLowerCase();
     
     // Crop recommendation requests
@@ -107,6 +108,20 @@ Just ask me anything about your zone or use the recommendation button for detail
   async function send() {
     if (!input.trim() || isLoading) return;
     
+    // Validate zoneId
+    const zoneId = parseInt(zoneInfo.zoneId);
+    if (isNaN(zoneId)) {
+      console.error('Invalid zone ID:', zoneInfo.zoneId);
+      const errorMsg: ChatMessage = {
+        id: `error-${Date.now()}`,
+        role: "assistant",
+        content: "Error: Invalid zone ID. Please refresh the page and try again.",
+        timestamp: new Date()
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+      return;
+    }
+    
     const userMsg: ChatMessage = { 
       id: `u-${Date.now()}`, 
       role: "user", 
@@ -118,17 +133,50 @@ Just ask me anything about your zone or use the recommendation button for detail
     setInput("");
     setIsLoading(true);
 
-    // Simulate AI response with realistic delay
-    setTimeout(() => {
+    try {
+      // Use the backend chat service for zone-specific chat
+      const response = await apiClient.sendZoneChatMessage(
+        zoneId, 
+        input.trim()
+      );
+
+      let aiResponse: string;
+      
+      if (response.data?.reply) {
+        // Backend AI response with prompt engineering and Gemini
+        aiResponse = response.data.reply;
+      } else if (response.error) {
+        // Fallback to local response if API fails
+        console.warn('Backend AI chat failed, using fallback response:', response.error);
+        aiResponse = generateFallbackResponse(input);
+      } else {
+        aiResponse = generateFallbackResponse(input);
+      }
+
       const assistantMsg: ChatMessage = {
         id: `a-${Date.now()}`,
         role: "assistant",
-        content: generateAIResponse(input),
+        content: aiResponse,
         timestamp: new Date()
       };
+      
       setMessages((prev) => [...prev, assistantMsg]);
+    } catch (error) {
+      console.error('Error getting AI response:', error);
+      
+      // Fallback to local response on error
+      const fallbackResponse = generateFallbackResponse(input);
+      const assistantMsg: ChatMessage = {
+        id: `a-${Date.now()}`,
+        role: "assistant",
+        content: fallbackResponse,
+        timestamp: new Date()
+      };
+      
+      setMessages((prev) => [...prev, assistantMsg]);
+    } finally {
       setIsLoading(false);
-    }, 800);
+    }
   }
 
   const formatTime = (date: Date) => {

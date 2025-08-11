@@ -31,6 +31,7 @@ services:
     ports:
       - "5000:5000"
     volumes:
+      - .:/app  # Mount the entire backend directory
       - ./prompts:/app/prompts
       - ./logs:/app/logs
       - ./ai_model:/app/ai_model

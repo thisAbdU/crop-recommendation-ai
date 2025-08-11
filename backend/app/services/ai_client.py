@@ -5,6 +5,8 @@ import numpy as np
 from flask import current_app
 import logging
 from datetime import datetime, timedelta
+from app.services.gemini_service import GeminiService
+from app.services.internet_service import InternetService
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +15,8 @@ class AIClient:
     
     def __init__(self):
         self.model_path = current_app.config.get('AGRI_AI_MODEL_PATH', 'ai_model')
+        self.gemini_service = GeminiService()
+        self.internet_service = InternetService()
         self._init_local_client()
     
     def _init_local_client(self):
@@ -58,6 +62,507 @@ class AIClient:
             self.model = None
             self.scaler = None
             self.ai_mode = 'mock'
+    
+    def chat_with_ai(self, context: dict, prompt_template: dict = None) -> str:
+        """
+        Chat with AI about agricultural topics using Gemini and internet data
+        
+        Args:
+            context (dict): Chat context including user message and zone data
+            prompt_template (dict): Optional prompt template configuration
+            
+        Returns:
+            str: AI-generated response
+        """
+        try:
+            # Validate if the query is agricultural
+            user_message = context.get('user_message', '')
+            validation_result = self.gemini_service.validate_agricultural_query(user_message)
+            
+            if not validation_result['is_agricultural']:
+                return validation_result['suggestion']
+            
+            # Get zone information for context
+            zone_info = self._extract_zone_info(context)
+            
+            # Get current agricultural context from internet
+            agricultural_context = self.internet_service.get_zone_agricultural_context(zone_info)
+            
+            # Build enhanced context for AI with crop focus
+            enhanced_context = self._build_enhanced_context(context, agricultural_context, zone_info)
+            
+            # Get prompt template content
+            prompt_content = self._get_prompt_content(prompt_template, context)
+            
+            # Generate response using Gemini
+            response = self.gemini_service.generate_agricultural_response(
+                prompt_content,
+                enhanced_context,
+                context.get('conversation_history', [])
+            )
+            
+            logger.info(f"AI chat response generated successfully for zone {zone_info.get('id', 'unknown')}")
+            return response
+            
+        except Exception as e:
+            logger.error(f"Error in chat_with_ai: {str(e)}")
+            return "I'm experiencing technical difficulties. Please try asking your agricultural question again, or contact support if the issue persists."
+    
+    def _extract_zone_info(self, context: dict) -> dict:
+        """Extract zone information from context"""
+        try:
+            zone_info = {}
+            
+            # Extract from recommendation data
+            if 'recommendation' in context:
+                rec = context['recommendation']
+                zone_info['id'] = rec.get('zone_id')
+                
+                # Get zone details from database if available
+                try:
+                    from app.models import Zone
+                    zone = Zone.query.get(rec.get('zone_id'))
+                    if zone:
+                        zone_info.update({
+                            'name': zone.name,
+                            'type': zone.zone_type,
+                            'area_hectare': float(zone.area_hectare) if zone.area_hectare else None,
+                            'latitude': float(zone.latitude) if zone.latitude else None,
+                            'longitude': float(zone.longitude) if zone.longitude else None,
+                            'admin_region': zone.name  # Use zone name as admin region for now
+                        })
+                except Exception as e:
+                    logger.warning(f"Could not fetch zone details: {str(e)}")
+            
+            return zone_info
+            
+        except Exception as e:
+            logger.error(f"Error extracting zone info: {str(e)}")
+            return {}
+    
+    def _build_enhanced_context(self, context: dict, agricultural_context: dict, zone_info: dict) -> dict:
+        """Build enhanced context for AI chat with crop recommendation focus"""
+        try:
+            enhanced_context = context.copy()
+            
+            # Add zone information
+            enhanced_context['zone_id'] = zone_info.get('id')
+            enhanced_context['zone_name'] = zone_info.get('name', 'Unknown Zone')
+            enhanced_context['zone_type'] = zone_info.get('type', 'Agricultural')
+            enhanced_context['area_hectare'] = zone_info.get('area_hectare')
+            enhanced_context['latitude'] = zone_info.get('latitude')
+            enhanced_context['longitude'] = zone_info.get('longitude')
+            enhanced_context['admin_region'] = zone_info.get('admin_region')
+            
+            # Add environmental data with crop focus
+            if 'recommendation' in context:
+                rec = context['recommendation']
+                enhanced_context['soil_conditions'] = {
+                    'ph': rec.get('data_used', {}).get('ph'),
+                    'nitrogen': rec.get('data_used', {}).get('N'),
+                    'phosphorus': rec.get('data_used', {}).get('P'),
+                    'potassium': rec.get('data_used', {}).get('K'),
+                    'moisture': rec.get('data_used', {}).get('humidity'),
+                    'temperature': rec.get('data_used', {}).get('temperature'),
+                    'rainfall': rec.get('data_used', {}).get('rainfall')
+                }
+                
+                enhanced_context['crop_recommendations'] = rec.get('crops', [])
+                enhanced_context['sensor_data'] = rec.get('data_used', {})
+                enhanced_context['data_used'] = rec.get('data_used', {})
+                
+                # Add recommendation metadata
+                enhanced_context['recommendation_metadata'] = {
+                    'id': rec.get('id'),
+                    'status': rec.get('status'),
+                    'created_at': rec.get('created_at'),
+                    'confidence_score': rec.get('confidence_score')
+                }
+            
+            # Add current agricultural context
+            enhanced_context['weather_data'] = agricultural_context.get('weather', {})
+            enhanced_context['weather_forecasts'] = agricultural_context.get('weather_forecast', {})
+            enhanced_context['recent_news'] = agricultural_context.get('news', [])
+            enhanced_context['market_trends'] = agricultural_context.get('market_trends', {})
+            enhanced_context['regional_developments'] = agricultural_context.get('regional_data', {})
+            
+            # Add seasonal factors
+            current_month = datetime.utcnow().month
+            if current_month in [12, 1, 2]:
+                season = 'Winter'
+            elif current_month in [3, 4, 5]:
+                season = 'Spring'
+            elif current_month in [6, 7, 8]:
+                season = 'Summer'
+            else:
+                season = 'Autumn'
+            
+            enhanced_context['seasonal_factors'] = {
+                'current_season': season,
+                'current_month': current_month,
+                'planting_season': season in ['Spring', 'Summer'],
+                'harvest_season': season in ['Autumn', 'Summer']
+            }
+            
+            # Add crop-specific context if available
+            if 'crop_recommendations' in enhanced_context and enhanced_context['crop_recommendations']:
+                enhanced_context['crop_context'] = self._build_crop_context(enhanced_context['crop_recommendations'])
+            
+            return enhanced_context
+            
+        except Exception as e:
+            logger.error(f"Error building enhanced context: {str(e)}")
+            return context
+    
+    def _build_crop_context(self, crops: list) -> dict:
+        """Build specialized context for recommended crops"""
+        try:
+            crop_context = {}
+            
+            for crop in crops:
+                if isinstance(crop, dict):
+                    crop_name = crop.get('crop', crop.get('name', 'Unknown'))
+                    confidence = crop.get('confidence', crop.get('score', 0))
+                    
+                    crop_context[crop_name] = {
+                        'confidence': confidence,
+                        'requirements': self._get_crop_requirements(crop_name),
+                        'seasonal_info': self._get_crop_seasonal_info(crop_name),
+                        'management_tips': self._get_crop_management_tips(crop_name)
+                    }
+                else:
+                    crop_name = str(crop)
+                    crop_context[crop_name] = {
+                        'confidence': 0.8,
+                        'requirements': self._get_crop_requirements(crop_name),
+                        'seasonal_info': self._get_crop_seasonal_info(crop_name),
+                        'management_tips': self._get_crop_management_tips(crop_name)
+                    }
+            
+            return crop_context
+            
+        except Exception as e:
+            logger.error(f"Error building crop context: {str(e)}")
+            return {}
+    
+    def _get_crop_requirements(self, crop_name: str) -> dict:
+        """Get basic requirements for a specific crop"""
+        # This could be enhanced with a crop database or API
+        crop_requirements = {
+            'rice': {
+                'soil_ph': '5.5-6.5',
+                'temperature': '20-35°C',
+                'water': 'High',
+                'nutrients': 'High N, moderate P, moderate K'
+            },
+            'wheat': {
+                'soil_ph': '6.0-7.5',
+                'temperature': '15-25°C',
+                'water': 'Moderate',
+                'nutrients': 'Moderate N, high P, moderate K'
+            },
+            'maize': {
+                'soil_ph': '5.5-7.5',
+                'temperature': '18-32°C',
+                'water': 'Moderate to high',
+                'nutrients': 'High N, moderate P, moderate K'
+            },
+            'cotton': {
+                'soil_ph': '5.5-8.5',
+                'temperature': '20-35°C',
+                'water': 'Moderate',
+                'nutrients': 'High N, moderate P, moderate K'
+            },
+            'jute': {
+                'soil_ph': '6.0-7.5',
+                'temperature': '24-37°C',
+                'water': 'High',
+                'nutrients': 'Moderate N, moderate P, moderate K'
+            },
+            'coconut': {
+                'soil_ph': '5.5-8.0',
+                'temperature': '20-32°C',
+                'water': 'High',
+                'nutrients': 'Moderate N, moderate P, high K'
+            },
+            'papaya': {
+                'soil_ph': '5.5-7.0',
+                'temperature': '21-33°C',
+                'water': 'Moderate',
+                'nutrients': 'Moderate N, moderate P, moderate K'
+            },
+            'orange': {
+                'soil_ph': '6.0-7.5',
+                'temperature': '13-37°C',
+                'water': 'Moderate',
+                'nutrients': 'Moderate N, moderate P, high K'
+            },
+            'apple': {
+                'soil_ph': '6.0-7.0',
+                'temperature': '7-35°C',
+                'water': 'Moderate',
+                'nutrients': 'Moderate N, moderate P, moderate K'
+            },
+            'muskmelon': {
+                'soil_ph': '6.0-7.5',
+                'temperature': '18-35°C',
+                'water': 'Moderate',
+                'nutrients': 'Moderate N, moderate P, moderate K'
+            },
+            'watermelon': {
+                'soil_ph': '5.5-7.5',
+                'temperature': '21-35°C',
+                'water': 'High',
+                'nutrients': 'Moderate N, moderate P, moderate K'
+            },
+            'grapes': {
+                'soil_ph': '5.5-7.5',
+                'temperature': '15-35°C',
+                'water': 'Moderate',
+                'nutrients': 'Moderate N, moderate P, moderate K'
+            },
+            'mango': {
+                'soil_ph': '5.5-7.5',
+                'temperature': '21-37°C',
+                'water': 'Moderate',
+                'nutrients': 'Moderate N, moderate P, moderate K'
+            },
+            'banana': {
+                'soil_ph': '5.5-7.5',
+                'temperature': '20-35°C',
+                'water': 'High',
+                'nutrients': 'High N, moderate P, high K'
+            },
+            'pomegranate': {
+                'soil_ph': '5.5-7.5',
+                'temperature': '15-35°C',
+                'water': 'Moderate',
+                'nutrients': 'Moderate N, moderate P, moderate K'
+            },
+            'lentil': {
+                'soil_ph': '6.0-7.5',
+                'temperature': '15-30°C',
+                'water': 'Low to moderate',
+                'nutrients': 'Low N, moderate P, moderate K'
+            },
+            'blackgram': {
+                'soil_ph': '6.0-7.5',
+                'temperature': '20-35°C',
+                'water': 'Moderate',
+                'nutrients': 'Low N, moderate P, moderate K'
+            },
+            'mungbean': {
+                'soil_ph': '6.0-7.5',
+                'temperature': '20-35°C',
+                'water': 'Moderate',
+                'nutrients': 'Low N, moderate P, moderate K'
+            },
+            'mothbean': {
+                'soil_ph': '6.0-7.5',
+                'temperature': '20-35°C',
+                'water': 'Low',
+                'nutrients': 'Low N, moderate P, moderate K'
+            },
+            'pigeonpeas': {
+                'soil_ph': '6.0-7.5',
+                'temperature': '20-35°C',
+                'water': 'Low to moderate',
+                'nutrients': 'Low N, moderate P, moderate K'
+            },
+            'kidneybeans': {
+                'soil_ph': '6.0-7.5',
+                'temperature': '15-30°C',
+                'water': 'Moderate',
+                'nutrients': 'Low N, moderate P, moderate K'
+            },
+            'chickpea': {
+                'soil_ph': '6.0-7.5',
+                'temperature': '15-30°C',
+                'water': 'Low to moderate',
+                'nutrients': 'Low N, moderate P, moderate K'
+            }
+        }
+        
+        return crop_requirements.get(crop_name.lower(), {
+            'soil_ph': '6.0-7.0',
+            'temperature': '20-30°C',
+            'water': 'Moderate',
+            'nutrients': 'Moderate N, moderate P, moderate K'
+        })
+    
+    def _get_crop_seasonal_info(self, crop_name: str) -> dict:
+        """Get seasonal information for a specific crop"""
+        # This could be enhanced with a crop database or API
+        seasonal_info = {
+            'rice': {'planting': 'Spring/Summer', 'harvest': 'Autumn', 'growing_period': '3-6 months'},
+            'wheat': {'planting': 'Winter', 'harvest': 'Spring', 'growing_period': '6-8 months'},
+            'maize': {'planting': 'Spring', 'harvest': 'Summer/Autumn', 'growing_period': '3-4 months'},
+            'cotton': {'planting': 'Spring', 'harvest': 'Autumn', 'growing_period': '5-6 months'},
+            'jute': {'planting': 'Spring', 'harvest': 'Summer', 'growing_period': '3-4 months'},
+            'coconut': {'planting': 'Year-round', 'harvest': 'Year-round', 'growing_period': '6-10 years'},
+            'papaya': {'planting': 'Spring', 'harvest': 'Year-round', 'growing_period': '6-12 months'},
+            'orange': {'planting': 'Spring', 'harvest': 'Winter', 'growing_period': '3-5 years'},
+            'apple': {'planting': 'Spring', 'harvest': 'Autumn', 'growing_period': '3-5 years'},
+            'muskmelon': {'planting': 'Spring', 'harvest': 'Summer', 'growing_period': '3-4 months'},
+            'watermelon': {'planting': 'Spring', 'harvest': 'Summer', 'growing_period': '3-4 months'},
+            'grapes': {'planting': 'Spring', 'harvest': 'Summer/Autumn', 'growing_period': '2-3 years'},
+            'mango': {'planting': 'Spring', 'harvest': 'Summer', 'growing_period': '3-5 years'},
+            'banana': {'planting': 'Year-round', 'harvest': 'Year-round', 'growing_period': '9-12 months'},
+            'pomegranate': {'planting': 'Spring', 'harvest': 'Autumn', 'growing_period': '3-5 years'},
+            'lentil': {'planting': 'Winter', 'harvest': 'Spring', 'growing_period': '4-5 months'},
+            'blackgram': {'planting': 'Summer', 'harvest': 'Autumn', 'growing_period': '3-4 months'},
+            'mungbean': {'planting': 'Summer', 'harvest': 'Autumn', 'growing_period': '3-4 months'},
+            'mothbean': {'planting': 'Summer', 'harvest': 'Autumn', 'growing_period': '3-4 months'},
+            'pigeonpeas': {'planting': 'Summer', 'harvest': 'Winter', 'growing_period': '5-7 months'},
+            'kidneybeans': {'planting': 'Spring', 'harvest': 'Summer', 'growing_period': '3-4 months'},
+            'chickpea': {'planting': 'Winter', 'harvest': 'Spring', 'growing_period': '4-5 months'}
+        }
+        
+        return seasonal_info.get(crop_name.lower(), {
+            'planting': 'Spring',
+            'harvest': 'Autumn',
+            'growing_period': '3-6 months'
+        })
+    
+    def _get_crop_management_tips(self, crop_name: str) -> list:
+        """Get management tips for a specific crop"""
+        # This could be enhanced with a crop database or API
+        management_tips = {
+            'rice': [
+                'Maintain consistent water level during growing season',
+                'Apply nitrogen fertilizer in split doses',
+                'Control weeds early in the growing season',
+                'Monitor for rice blast disease'
+            ],
+            'wheat': [
+                'Ensure proper seedbed preparation',
+                'Apply phosphorus at planting',
+                'Control rust diseases with fungicides',
+                'Harvest when grain moisture is 13-14%'
+            ],
+            'maize': [
+                'Plant at proper depth (2-3 inches)',
+                'Maintain adequate plant population',
+                'Apply nitrogen in split applications',
+                'Control corn borers and earworms'
+            ],
+            'cotton': [
+                'Plant when soil temperature reaches 60°F',
+                'Control bollworms and aphids',
+                'Apply growth regulators if needed',
+                'Harvest when 60% of bolls are open'
+            ]
+        }
+        
+        return management_tips.get(crop_name.lower(), [
+            'Ensure proper soil preparation',
+            'Monitor for pests and diseases',
+            'Apply fertilizers based on soil test results',
+            'Maintain adequate irrigation'
+        ])
+    
+    def _get_prompt_content(self, prompt_template: dict, context: dict) -> str:
+        """Get prompt template content"""
+        try:
+            if not prompt_template:
+                # Use default zone admin chat template
+                return self._get_default_zone_admin_prompt()
+            
+            # Try to get template content from file
+            try:
+                from app.services.prompt_service import PromptService
+                prompt_service = PromptService()
+                template_content = prompt_service.get_template_content(prompt_template['id'])
+                return template_content
+            except Exception as e:
+                logger.warning(f"Could not load prompt template: {str(e)}")
+                return self._get_default_zone_admin_prompt()
+                
+        except Exception as e:
+            logger.error(f"Error getting prompt content: {str(e)}")
+            return self._get_default_zone_admin_prompt()
+    
+    def _get_default_zone_admin_prompt(self) -> str:
+        """Get default zone admin chat prompt"""
+        return """# Zone Admin Agricultural AI Assistant
+
+You are an expert agricultural AI assistant specialized in providing comprehensive guidance for zone administrators. Your role is to help with crop management, soil analysis, weather considerations, and agricultural best practices specific to the zone you're assisting.
+
+## IMPORTANT RULES:
+1. **ONLY answer questions related to agriculture, farming, crops, soil, weather, and zone management**
+2. **NEVER answer questions about politics, current events, or any non-agricultural topics**
+3. **Always provide zone-specific, contextual advice based on the available data and crop recommendations**
+4. **Use current weather and environmental data when available**
+5. **Reference recent agricultural news and developments in the region when relevant**
+6. **Focus on the specific crops recommended for this zone and their requirements**
+7. **Provide actionable advice for farming practices, crop management, and soil health**
+
+## Zone Context:
+- **Zone ID**: {{ zone_id }}
+- **Zone Name**: {{ zone_name }}
+- **Zone Type**: {{ zone_type }}
+- **Area**: {{ area_hectare }} hectares
+- **Location**: {{ latitude }}, {{ longitude }}
+- **Administrative Region**: {{ admin_region }}
+
+## Current Environmental Data:
+- **Soil Conditions**: {{ soil_conditions }}
+- **Weather Data**: {{ weather_data }}
+- **Recent Sensor Readings**: {{ sensor_data }}
+- **Seasonal Factors**: {{ seasonal_factors }}
+
+## Crop Recommendations (Current):
+{{ crop_recommendations }}
+
+## Recent Crop Data Used for Recommendations:
+{{ data_used }}
+
+## Current Agricultural Context:
+- **Recent Agricultural News**: {{ recent_news }}
+- **Market Trends**: {{ market_trends }}
+- **Regional Developments**: {{ regional_developments }}
+- **Weather Forecasts**: {{ weather_forecasts }}
+
+## Conversation Context:
+{{ conversation_context }}
+
+## User Query:
+{{ user_message }}
+
+## Response Guidelines:
+1. **Be specific to the zone's conditions and current crop recommendations**
+2. **Provide actionable agricultural advice with current best practices**
+3. **Reference current environmental data and weather forecasts**
+4. **Suggest optimal practices for the specific crops recommended**
+5. **Consider seasonal factors, local agricultural practices, and current research**
+6. **Integrate relevant current agricultural news and market information**
+7. **If asked about non-agricultural topics, politely redirect to farming-related subjects**
+8. **Use internet data to provide up-to-date information on agricultural innovations, pest management, and sustainable practices**
+9. **Address questions about crop management, fertilization, irrigation, pest control, and harvesting**
+10. **Provide guidance on crop rotation, soil health improvement, and sustainable farming practices**
+
+## Specialized Response Areas:
+- **Crop Management**: Planting schedules, spacing, watering, fertilization
+- **Soil Health**: pH management, nutrient balancing, organic matter improvement
+- **Pest & Disease Control**: Integrated pest management, disease prevention
+- **Weather Adaptation**: Drought resistance, flood management, seasonal planning
+- **Market Intelligence**: Crop pricing, demand trends, export opportunities
+- **Technology Integration**: IoT sensors, precision agriculture, automation
+- **Sustainability**: Organic farming, conservation practices, resource efficiency
+
+## Response Format:
+Provide a comprehensive, helpful response that directly addresses the user's agricultural question while staying within the scope of farming and zone management. Include specific recommendations based on the zone's current conditions, crop recommendations, and current agricultural knowledge. Reference recent developments and best practices when relevant.
+
+## Internet Integration Focus:
+- Agricultural research and innovations
+- Pest and disease management updates
+- Sustainable farming practices
+- Market trends for agricultural products
+- Weather-related agricultural advisories
+- Regional agricultural developments
+- Crop-specific best practices and research
+
+Remember: You are a specialized agricultural AI assistant with internet access. Stay focused on farming, crops, soil, weather, and zone management topics only. Use current data to provide the most relevant and up-to-date agricultural advice. Always relate your responses to the specific crops recommended for this zone and their current growing conditions."""
     
     def generate_crop_recommendation(self, sensor_data, weather_data=None, zone_info=None):
         """

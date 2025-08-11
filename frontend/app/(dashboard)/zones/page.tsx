@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { loadAuth } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -142,8 +142,8 @@ export default function ZonesPage() {
   });
 
   useEffect(() => {
-    const auth = loadAuth();
-    if (!auth || auth.user.role !== "central_admin") {
+    const user = getCurrentUser();
+    if (!user || user.role !== "central_admin") {
       router.replace("/login");
       return;
     }

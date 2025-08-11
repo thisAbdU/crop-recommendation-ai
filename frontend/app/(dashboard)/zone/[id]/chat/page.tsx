@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { loadAuth } from "@/lib/auth";
-import { AIChat } from "@/components/chat/ai-chat";
+import { ZoneAIChat } from "@/components/chat/zone-ai-chat";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, MapPin, Leaf, Thermometer, Calendar } from "lucide-react";
@@ -29,21 +29,19 @@ export default function ZoneChatPage() {
       return;
     }
 
-    // Simulate fetching zone data
-    setTimeout(() => {
-      setZoneData({
-        id: params.id as string,
-        name: "Green Valley",
-        topSoilType: "Loam",
-        topRecommendations: [
-          { crop_name: "Maize" },
-          { crop_name: "Wheat" }
-        ],
-        bestScore: 82,
-        lastSensorUpdate: new Date().toISOString()
-      });
-      setLoading(false);
-    }, 500);
+    // Set zone data immediately with the ID from params
+    setZoneData({
+      id: params.id as string,
+      name: "Green Valley",
+      topSoilType: "Loam",
+      topRecommendations: [
+        { crop_name: "Maize" },
+        { crop_name: "Wheat" }
+      ],
+      bestScore: 82,
+      lastSensorUpdate: new Date().toISOString()
+    });
+    setLoading(false);
   }, [params.id, router]);
 
   if (loading) {
@@ -82,6 +80,11 @@ export default function ZoneChatPage() {
     return "low";
   };
 
+  const handleGenerateRecommendation = (startDate: string, endDate: string) => {
+    // Navigate to recommendation generation page
+    router.push(`/zone/${zoneData.id}/recommendations?start=${startDate}&end=${endDate}`);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -116,7 +119,7 @@ export default function ZoneChatPage() {
                 <div className="flex items-center gap-3">
                   <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-green-100">
                     <Leaf className="w-4 h-4 text-green-600" />
-                  </div>
+                </div>
                   <div>
                     <p className="text-sm font-medium">Top Crops</p>
                     <div className="flex flex-wrap gap-1 mt-1">
@@ -169,14 +172,30 @@ export default function ZoneChatPage() {
 
         {/* Chat Interface */}
         <div className="lg:col-span-2">
-          <AIChat
-            seed={`Welcome to ${zoneData.name}! I'm your AI assistant for this agricultural zone. I can help you with crop recommendations, soil analysis, weather insights, and sensor data interpretation. What would you like to know about ${zoneData.name}?`}
+          <ZoneAIChat
             zoneInfo={{
               name: zoneData.name,
               soilType: zoneData.topSoilType,
               topCrops: zoneData.topRecommendations.map(r => r.crop_name),
-              suitability: zoneData.bestScore
+              suitability: zoneData.bestScore,
+              zoneId: zoneData.id
             }}
+            onGenerateRecommendation={handleGenerateRecommendation}
+            recentSensorData={[
+              {
+                id: 1,
+                zone_id: zoneData.id,
+                read_from_iot_at: new Date().toISOString(),
+                temperature: 24,
+                humidity: 70,
+                soil_moisture: 65,
+                ph: 6.5,
+                nitrogen: 45,
+                phosphorus: 30,
+                potassium: 25,
+                rainfall: 0
+              }
+            ]}
           />
         </div>
       </div>

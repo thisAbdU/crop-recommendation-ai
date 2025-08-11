@@ -238,7 +238,7 @@ export async function mockIoTDataIngestion(zoneId: string, sensorData: any): Pro
     return await response.json();
   } catch (error) {
     console.error('Error mocking IoT data ingestion:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }
 
@@ -253,7 +253,7 @@ export async function getZones(): Promise<Zone[]> {
 }
 
 export async function getZoneById(id: string): Promise<Zone | undefined> {
-  return mockZones.find((z) => z.id === id);
+  return mockZones.find((z) => z.id === parseInt(id));
 }
 
 export async function getRecommendationsByZone(zoneId: string): Promise<Recommendation[]> {
@@ -304,8 +304,9 @@ export async function getTechnicians(): Promise<Technician[]> {
 }
 
 export async function assignTechnicianToZone(technicianId: string, zoneId: string): Promise<Technician | null> {
-  const tech = mockTechnicians.find((t) => t.id === technicianId);
+  const tech = mockTechnicians.find((t) => t.id === parseInt(technicianId));
   if (!tech) return null;
+  if (!tech.assignedZoneIds) tech.assignedZoneIds = [];
   if (!tech.assignedZoneIds.includes(zoneId)) tech.assignedZoneIds.push(zoneId);
   return tech;
 }
@@ -321,7 +322,7 @@ export async function getDashboardDataForRole(role: Role, user?: User) {
         zones.map(async (zone) => {
           // Get recommendations for this zone
           const zoneRecs = userRecommendations
-            .filter((r) => r.zoneId === zone.id)
+            .filter((r) => r.zoneId === zone.id.toString())
             .sort((a, b) => b.suitability_score - a.suitability_score);
 
           // Get the best recommendation for this zone
@@ -348,10 +349,10 @@ export async function getDashboardDataForRole(role: Role, user?: User) {
       return Promise.all(
         mockZones.map(async (zone) => {
           const recs = mockRecommendations
-            .filter((r) => r.zoneId === zone.id)
+            .filter((r) => r.zoneId === zone.id.toString())
             .sort((a, b) => b.suitability_score - a.suitability_score);
 
-          const data = mockSensorData.filter((d) => d.zone_id === zone.id);
+          const data = mockSensorData.filter((d) => d.zone_id === zone.id.toString());
           const avg = (arr: number[]) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0);
           const avgPh = Number(avg(data.map((d) => d.ph)).toFixed(2));
           const avgMoisture = Number(avg(data.map((d) => d.soil_moisture)).toFixed(2));
@@ -375,10 +376,10 @@ export async function getDashboardDataForRole(role: Role, user?: User) {
     }
   }
 
-  if (role === "zone_admin" && user?.zoneId) {
-    const recs = mockRecommendations.filter((r) => r.zoneId === user.zoneId);
-    const farmersInZone = mockFarmers.filter((f) => f.zone_id === user.zoneId);
-    const activeDevices = mockDevices.filter((d) => d.zone_id === user.zoneId && d.status === "online");
+  if (role === "zone_admin" && user?.zone_id) {
+    const recs = mockRecommendations.filter((r) => r.zoneId === user.zone_id);
+    const farmersInZone = mockFarmers.filter((f) => f.zone_id === user.zone_id);
+    const activeDevices = mockDevices.filter((d) => d.zone_id === user.zone_id && d.status === "online");
     return {
       stats: {
         totalFarmers: farmersInZone.length,
@@ -410,20 +411,20 @@ export async function getFarmersByZone(zoneId: string): Promise<Farmer[]> {
 }
 
 export async function createFarmer(farmer: Omit<Farmer, "id">): Promise<Farmer> {
-  const newFarmer: Farmer = { ...farmer, id: `f${Math.random().toString(36).slice(2, 8)}` };
+  const newFarmer: Farmer = { ...farmer, id: Math.floor(Math.random() * 10000) + 1000 };
   mockFarmers.push(newFarmer);
   return newFarmer;
 }
 
 export async function updateFarmer(id: string, updates: Partial<Omit<Farmer, "id">>): Promise<Farmer | null> {
-  const idx = mockFarmers.findIndex((f) => f.id === id);
+  const idx = mockFarmers.findIndex((f) => f.id === parseInt(id));
   if (idx === -1) return null;
   mockFarmers[idx] = { ...mockFarmers[idx], ...updates };
   return mockFarmers[idx];
 }
 
 export async function deleteFarmer(id: string): Promise<boolean> {
-  const idx = mockFarmers.findIndex((f) => f.id === id);
+  const idx = mockFarmers.findIndex((f) => f.id === parseInt(id));
   if (idx === -1) return false;
   mockFarmers.splice(idx, 1);
   return true;

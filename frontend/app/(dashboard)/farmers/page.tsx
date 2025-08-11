@@ -41,8 +41,7 @@ export default function FarmersPage() {
 
   const filteredFarmers = farmers.filter((farmer) =>
     farmer.name.toLowerCase().includes(search.toLowerCase()) ||
-    farmer.phone.includes(search) ||
-    farmer.language.toLowerCase().includes(search.toLowerCase())
+    farmer.phone.includes(search)
   );
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -52,7 +51,7 @@ export default function FarmersPage() {
     try {
       if (editingFarmer?.id) {
         // Update existing farmer
-        await updateFarmer(editingFarmer.id, editingFarmer);
+        await updateFarmer(editingFarmer.id.toString(), editingFarmer);
       } else {
         // Create new farmer
         await createFarmer({
@@ -89,8 +88,7 @@ export default function FarmersPage() {
     setEditingFarmer({
       name: "",
       phone: "",
-      language: "English",
-      zoneId: user?.zoneId || "",
+      zone_id: user?.zoneId || "",
     });
     setModal(true);
   };
@@ -141,7 +139,6 @@ export default function FarmersPage() {
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Phone</TableHead>
-                    <TableHead>Language</TableHead>
                     <TableHead>Zone</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -151,8 +148,7 @@ export default function FarmersPage() {
                     <TableRow key={farmer.id}>
                       <TableCell className="font-medium">{farmer.name}</TableCell>
                       <TableCell>{farmer.phone}</TableCell>
-                      <TableCell>{farmer.language}</TableCell>
-                      <TableCell>{farmer.zoneId}</TableCell>
+                      <TableCell>{farmer.zone_id}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button
@@ -165,7 +161,7 @@ export default function FarmersPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleDelete(farmer.id)}
+                            onClick={() => handleDelete(farmer.id.toString())}
                             className="text-red-600 hover:text-red-700"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -189,44 +185,27 @@ export default function FarmersPage() {
               </DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Name</label>
-                <Input
-                  value={editingFarmer?.name || ""}
-                  onChange={(e) => setEditingFarmer({ ...editingFarmer, name: e.target.value })}
-                  placeholder="Farmer's full name"
-                  required
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Phone Number</label>
-                <Input
-                  value={editingFarmer?.phone || ""}
-                  onChange={(e) => setEditingFarmer({ ...editingFarmer, phone: e.target.value })}
-                  placeholder="Phone number"
-                  required
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Language</label>
-                <Select
-                  value={editingFarmer?.language || "English"}
-                  onValueChange={(value) => setEditingFarmer({ ...editingFarmer, language: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="English">English</SelectItem>
-                    <SelectItem value="Spanish">Spanish</SelectItem>
-                    <SelectItem value="French">French</SelectItem>
-                    <SelectItem value="German">German</SelectItem>
-                    <SelectItem value="Chinese">Chinese</SelectItem>
-                    <SelectItem value="Hindi">Hindi</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium">Name</label>
+                  <Input
+                    value={editingFarmer?.name || ""}
+                    onChange={(e) =>
+                      setEditingFarmer({ ...editingFarmer, name: e.target.value })
+                    }
+                    placeholder="Enter farmer name"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Phone</label>
+                  <Input
+                    value={editingFarmer?.phone || ""}
+                    onChange={(e) =>
+                      setEditingFarmer({ ...editingFarmer, phone: e.target.value })
+                    }
+                    placeholder="Enter phone number"
+                  />
+                </div>
               </div>
               
               <div className="flex justify-end gap-3 pt-4">
